@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Family Kitchen">
+<meta name="theme-color" content="#080C14">
+<title>Family Kitchen</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+:root{
+  --bg:#080C14;--card:#0F1520;--card2:#141C2B;--border:#1E2D45;
+  --t1:#E8EEF8;--t2:#8B949E;--t3:#4A5568;
+  --blue:#3B82F6;--green:#22C55E;--red:#EF4444;
+  --orange:#F97316;--yellow:#EAB308;--teal:#14B8A6;--pur:#A855F7;
+}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#app{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scroll::-webkit-scrollbar{display:none}
+input{font-family:inherit;color:var(--t1);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:14px;width:100%;outline:none}
+button{cursor:pointer;font-family:inherit;border:none;outline:none;-webkit-tap-highlight-color:transparent}
+button:active{opacity:.75}
+.fade{animation:fade .2s ease}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><div style="font-size:40px">🏠</div><div style="color:#8B949E;font-size:13px">Loading...</div></div></div>
+<script>
+// ═══════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════
+const ALIASES={"chicken thighs":"Fresh Chicken Thighs","ground beef":"Ground Beef 85/15","ground beef (lean)":"Ground Beef 85/15","salmon":"Salmon (wild-caught)","tomatoes":"Cherry Tomatoes","potatoes":"Regular Potatoes","eggs":"Eggs (Goldhen Brown)","greek yogurt":"Greek Yogurt (Chobani)","yogurt":"Greek Yogurt (Chobani)","butter":"Irish Butter Salted","granola":"GF Granola (Purely Elizabeth)","rice":"White Rice","maple syrup":"Real Maple Syrup","shrimp":"Shrimp (raw frozen)","peppers":"Multi-Colored Peppers","lettuce":"Romaine Lettuce","romaine":"Romaine Lettuce","avocado":"Avocados","broccoli":"Broccoli"};
+const CAT_CLR={protein:"#EF4444",dairy:"#EAB308",produce:"#22C55E",frozen:"#14B8A6",pantry:"#F97316",snack:"#A855F7",other:"#8B949E"};
+const LOC_INFO={fridge:{icon:"🧊",color:"#3B82F6",label:"Fridge"},freezer:{icon:"❄️",color:"#14B8A6",label:"Freezer"},pantry:{icon:"🏠",color:"#F97316",label:"Pantry"}};
+const STATUS_INFO={ok:{bg:"#14532D",txt:"#4ADE80",label:"✓ Good"},low:{bg:"#422006",txt:"#FB923C",label:"⚡ Low"},critical:{bg:"#450A0A",txt:"#F87171",label:"🔴 Critical"},expiring:{bg:"#431407",txt:"#FB923C",label:"⏰ Soon"},urgent:{bg:"#450A0A",txt:"#EF4444",label:"🔥 Today"},expired:{bg:"#1C1917",txt:"#78716C",label:"💀 Expired"},empty:{bg:"#111827",txt:"#6B7280",label:"📦 Empty"}};
+
+const now=()=>new Date().toISOString();
+function mkItem(id,name,qty,unit,loc,cat,expDays,price=0,low=0,crit=0){return{id,name,qty,unit,loc,cat,expDays,addedDate:now(),price,low,crit};}
+
+const DEFAULT_ITEMS=[
+  mkItem("a01","Eggs (Goldhen Brown)",12,"count","fridge","dairy",35,8.99,6,3),
+  mkItem("a02","Fresh Chicken Thighs",2.75,"lbs","fridge","protein",4,13.50,1,0),
+  mkItem("a03","Chicken Drumsticks",9.5,"lbs","freezer","protein",180,9.50,2,0),
+  mkItem("a04","Ground Beef 85/15",3,"packs","freezer","protein",180,35.00,1,0),
+  mkItem("a05","Pulled Beef Brisket",2,"packs","fridge","protein",5,18.30,1,0),
+  mkItem("a06","Shrimp (raw frozen)",1,"packs","freezer","protein",90,22.00,1,0),
+  mkItem("a07","Andouille Sausage",1,"count","fridge","protein",7,4.75,0,0),
+  mkItem("a08","Salmon (wild-caught)",0,"lbs","freezer","protein",180,39.00,1,0),
+  mkItem("a09","Steak",0,"lbs","freezer","protein",180,45.00,1,0),
+  mkItem("a10","Rotisserie Chicken",0,"count","fridge","protein",4,4.99,1,0),
+  mkItem("a11","Greek Yogurt (Chobani)",1,"32oz tub","fridge","dairy",7,6.99,1,0),
+  mkItem("a12","Almond Milk",2,"cartons","fridge","dairy",10,5.49,1,0),
+  mkItem("a13","Heavy Whipping Cream",1,"count","fridge","dairy",14,4.55,0,0),
+  mkItem("a14","Irish Butter Salted",1,"count","fridge","dairy",30,3.65,0,0),
+  mkItem("a15","Parmesan Wedge",1,"count","fridge","dairy",30,4.85,0,0),
+  mkItem("a16","Whole Milk Organic",1,"count","fridge","dairy",7,5.49,0,0),
+  mkItem("a17","Shredded Cheese",0,"bags","fridge","dairy",14,9.99,1,0),
+  mkItem("b01","Asparagus",1,"bunches","fridge","produce",1,6.99,0,0),
+  mkItem("b02","Cherry Tomatoes",1,"count","fridge","produce",5,5.99,0,0),
+  mkItem("b03","Romaine Lettuce",1,"bags","fridge","produce",3,5.99,0,0),
+  mkItem("b04","Kale",1,"bags","fridge","produce",3,4.99,0,0),
+  mkItem("b05","Brussels Sprouts",1,"lbs","fridge","produce",3,6.99,0,0),
+  mkItem("b06","Blueberries",2,"pints","fridge","produce",2,9.99,0,0),
+  mkItem("b07","Multi-Colored Peppers",1,"packs","fridge","produce",7,6.99,0,0),
+  mkItem("b08","Sweet Corn",1,"count","fridge","produce",4,3.25,0,0),
+  mkItem("b09","Cabbage",3,"lbs","fridge","produce",14,2.55,0,0),
+  mkItem("b10","Sweet Potatoes",1,"bags","pantry","produce",30,7.99,0,0),
+  mkItem("b11","Bananas",1,"bunches","pantry","produce",5,1.99,0,0),
+  mkItem("b12","Honeycrisp Apples",2,"bags","fridge","produce",21,9.99,0,0),
+  mkItem("b13","Navel Oranges",2,"bags","fridge","produce",14,9.99,0,0),
+  mkItem("b14","Red Onions",1,"bags","pantry","produce",30,4.99,0,0),
+  mkItem("b15","Avocados",0,"count","pantry","produce",5,6.99,2,0),
+  mkItem("b16","Broccoli",0,"heads","fridge","produce",7,5.99,1,0),
+  mkItem("c01","Pepperoni Pizza",1,"count","freezer","frozen",90,5.05,0,0),
+  mkItem("c02","Cheese Pizza",1,"count","freezer","frozen",90,5.05,0,0),
+  mkItem("c03","Chicken Nuggets GF",1,"bags","freezer","frozen",90,5.75,0,0),
+  mkItem("c04","Sausage Links",2,"packs","freezer","frozen",90,3.78,0,0),
+  mkItem("c05","French Toast Sticks",1,"boxes","freezer","frozen",90,3.49,0,0),
+  mkItem("c06","Gen Tso Chicken GF",1,"count","freezer","frozen",90,6.59,0,0),
+  mkItem("c07","French Toast Sticks (thawed)",1,"boxes","fridge","frozen",1,0,0,0),
+  mkItem("c08","Eggo Waffles (thawed)",1,"bags","fridge","frozen",1,0,0,0),
+  mkItem("d01","Real Maple Syrup",1,"bottles","pantry","pantry",365,5.85,0,0),
+  mkItem("d02","GF Cinnamon Cheerios",1,"count","pantry","pantry",180,5.45,0,0),
+  mkItem("d03","Brioche Buns",2,"packs","pantry","pantry",7,7.98,0,0),
+  mkItem("d04","Pink Himalayan Salt",1,"containers","pantry","pantry",1095,0,0,0),
+  mkItem("d05","Black Pepper",1,"containers","pantry","pantry",1095,0,0,0),
+  mkItem("d06","White Rice",0,"lbs","pantry","pantry",365,18.99,2,0),
+  mkItem("d07","Regular Potatoes",0,"lbs","pantry","pantry",30,8.99,2,0),
+  mkItem("d08","Corn Tortillas GF",0,"count","pantry","pantry",14,6.99,12,0),
+  mkItem("d09","Almond Butter",0,"jars","pantry","pantry",180,13.99,1,0),
+  mkItem("d10","GF Granola (Purely Elizabeth)",0,"bags","pantry","pantry",90,12.99,1,0),
+  mkItem("d11","Olive Oil",0,"bottles","pantry","pantry",365,15.99,1,0),
+  mkItem("d12","Chia Seeds",1,"count","pantry","pantry",365,4.09,0,0),
+  mkItem("e01","Grass-Fed Beef Sticks",1,"packs","pantry","snack",60,14.29,0,0),
+];
+
+const DEFAULT_RECIPES=[
+  {id:"r01",name:"Greek Yogurt Bowl",gf:true,cat:"breakfast",servings:1,ings:[{n:"Greek Yogurt (Chobani)",q:1,u:"cup"},{n:"GF Granola (Purely Elizabeth)",q:0.25,u:"bag"},{n:"Blueberries",q:0.5,u:"pint"},{n:"Almond Butter",q:0.1,u:"jar"}]},
+  {id:"r02",name:"Eggs Breakfast",gf:true,cat:"breakfast",servings:1,ings:[{n:"Eggs (Goldhen Brown)",q:3,u:"count"},{n:"Irish Butter Salted",q:0.1,u:"count"}]},
+  {id:"r03",name:"Eggs & Avocado Bowl",gf:true,cat:"breakfast",servings:2,ings:[{n:"Eggs (Goldhen Brown)",q:4,u:"count"},{n:"Avocados",q:2,u:"count"},{n:"Cherry Tomatoes",q:0.5,u:"count"}]},
+  {id:"r04",name:"GF Cheerios Bowl",gf:true,cat:"breakfast",servings:1,ings:[{n:"GF Cinnamon Cheerios",q:1,u:"serving"},{n:"Almond Milk",q:1,u:"cup"}]},
+  {id:"r05",name:"Salmon & Asparagus",gf:true,cat:"dinner",servings:2,ings:[{n:"Salmon (wild-caught)",q:1,u:"lb"},{n:"Asparagus",q:1,u:"bunch"},{n:"Irish Butter Salted",q:0.1,u:"count"}]},
+  {id:"r06",name:"Rotisserie Chicken Plate",gf:true,cat:"lunch",servings:4,ings:[{n:"Rotisserie Chicken",q:1,u:"count"},{n:"Kale",q:1,u:"bag"}]},
+  {id:"r07",name:"Chicken Rice & Vegetables",gf:true,cat:"dinner",servings:4,ings:[{n:"Fresh Chicken Thighs",q:1.5,u:"lbs"},{n:"White Rice",q:1,u:"lb"},{n:"Multi-Colored Peppers",q:0.5,u:"pack"}]},
+  {id:"r08",name:"Ground Beef & Potatoes",gf:true,cat:"dinner",servings:4,ings:[{n:"Ground Beef 85/15",q:1.5,u:"lbs"},{n:"Regular Potatoes",q:2,u:"lbs"},{n:"Red Onions",q:0.25,u:"bag"}]},
+  {id:"r09",name:"Taco Night",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef 85/15",q:1.5,u:"lbs"},{n:"Corn Tortillas GF",q:15,u:"count"},{n:"Shredded Cheese",q:0.5,u:"bag"},{n:"Romaine Lettuce",q:0.5,u:"bag"},{n:"Cherry Tomatoes",q:1,u:"count"}]},
+  {id:"r10",name:"Steak & Vegetables",gf:true,cat:"dinner",servings:2,ings:[{n:"Steak",q:1,u:"lb"},{n:"Asparagus",q:1,u:"bunch"},{n:"Regular Potatoes",q:1,u:"lb"}]},
+  {id:"r11",name:"Chicken Thighs & Broccoli",gf:true,cat:"dinner",servings:4,ings:[{n:"Fresh Chicken Thighs",q:1.5,u:"lbs"},{n:"Broccoli",q:1,u:"head"}]},
+  {id:"r12",name:"Shrimp Stir Fry",gf:true,cat:"dinner",servings:3,ings:[{n:"Shrimp (raw frozen)",q:1,u:"pack"},{n:"Multi-Colored Peppers",q:1,u:"pack"},{n:"Kale",q:0.5,u:"bag"},{n:"Cabbage",q:0.5,u:"lb"}]},
+  {id:"r13",name:"Brisket & Cabbage Bowl",gf:true,cat:"dinner",servings:4,ings:[{n:"Pulled Beef Brisket",q:1,u:"pack"},{n:"Cabbage",q:0.5,u:"lb"},{n:"Multi-Colored Peppers",q:0.5,u:"pack"}]},
+  {id:"r14",name:"Gen Tso's Chicken",gf:true,cat:"dinner",servings:3,ings:[{n:"Gen Tso Chicken GF",q:1,u:"count"}]},
+];
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let S={items:[],recipes:[],tab:"home",pantrySearch:"",pantryLoc:"all",mealTab:"breakfast",cooking:null,shopBought:{}};
+let toastTimer=null;
+
+function setState(u,skipRender=false){
+  S=Object.assign({},S,u);
+  if(!skipRender)render();
+}
+function saveItems(){try{localStorage.setItem("fk-items",JSON.stringify(S.items));}catch{}}
+function saveRecipes(){try{localStorage.setItem("fk-recipes",JSON.stringify(S.recipes));}catch{}}
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function daysLeft(item){
+  if(!item.addedDate||!item.expDays)return null;
+  return Math.ceil((new Date(item.addedDate).getTime()+item.expDays*86400000-Date.now())/86400000);
+}
+function itemStatus(item){
+  if(item.qty<=0)return"empty";
+  const d=daysLeft(item);
+  if(d!==null&&d<=0)return"expired";
+  if(d!==null&&d<=1)return"urgent";
+  if(d!==null&&d<=3)return"expiring";
+  if(item.qty<=item.crit&&item.crit>0)return"critical";
+  if(item.qty<=item.low&&item.low>0)return"low";
+  return"ok";
+}
+function resolveItem(name){
+  const key=name.toLowerCase().trim();
+  const resolved=(ALIASES[key]||name).toLowerCase();
+  return S.items.find(i=>i.name.toLowerCase()===resolved||i.name.toLowerCase()===key);
+}
+function alertCount(){
+  return S.items.filter(i=>["urgent","expired","expiring"].includes(itemStatus(i))&&i.qty>0).length;
+}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+// ═══════════════════════════════════════════════
+// COMPONENTS (return HTML strings)
+// ═══════════════════════════════════════════════
+function header(){
+  return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
+    <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">🏠 Family Kitchen</div>
+    <div style="font-size:10px;color:var(--t2);margin-top:2px">Anthon · Wife · Noah GF✓ · Zayden · Iris · ${S.items.length} items</div>
+  </div>`;}
+
+function bottomNav(){
+  const tabs=[{id:"home",icon:"🏠",label:"Home"},{id:"pantry",icon:"📦",label:"Pantry"},{id:"meals",icon:"🍽️",label:"Meals"},{id:"shop",icon:"🛒",label:"Shop"},{id:"alerts",icon:"⏰",label:alertCount()>0?`(${alertCount()})`:"Alerts"}];
+  return`<div style="background:#0A0E18;border-top:1px solid var(--border);display:flex;padding:8px 0 12px;flex-shrink:0">
+    ${tabs.map(t=>`<button data-action="tab" data-tab="${t.id}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:transparent;padding:4px 0;opacity:${S.tab===t.id?1:.4}">
+      <span style="font-size:22px;line-height:1">${t.icon}</span>
+      <span style="font-size:9px;font-weight:${S.tab===t.id?700:500};color:${S.tab===t.id?"#3B82F6":"#8B949E"}">${t.label}</span>
+    </button>`).join("")}
+  </div>`;}
+
+function toast(msg){
+  return`<div id="toast" style="position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1E2D45;color:#E8EEF8;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5);border:1px solid var(--border);pointer-events:none">${esc(msg)}</div>`;}
+
+function cookModal(){
+  const {recipe,ings}=S.cooking;
+  const allGood=ings.every(i=>i.ok);
+  return`<div data-action="close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
+    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid var(--border);border-bottom:none">
+      <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:3px">${esc(recipe.name)}</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:14px">Tap COOK to deduct from pantry</div>
+      <div style="margin-bottom:14px">
+        ${ings.map(i=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+          <span style="color:#E8EEF8">${esc(i.n)}</span>
+          <span style="color:${i.ok?"#4ADE80":"#EF4444"};font-weight:700">${i.ok?"✓ have enough":"✗ "+(i.have===0?"out of stock":"only "+i.have+" "+i.u)}</span>
+        </div>`).join("")}
+      </div>
+      ${!allGood?`<div style="background:#450A0A;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#FCA5A5">⚠️ Short on some items. Cook anyway?</div>`:""}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-modal" style="padding:13px;background:var(--card2);color:var(--t1);border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="confirm-cook" style="padding:13px;background:${allGood?"#16A34A":"#DC2626"};color:#fff;border-radius:12px;font-size:14px;font-weight:700">${allGood?"Let's Cook! 🍳":"Cook Anyway"}</button>
+      </div>
+    </div>
+  </div>`;}
+
+// ── HOME ─────────────────────────────────────────────────────
+function homeTab(){
+  const urgent=S.items.filter(i=>["urgent","expired"].includes(itemStatus(i))&&i.qty>0);
+  const expiring=S.items.filter(i=>itemStatus(i)==="expiring"&&i.qty>0);
+  const cookable=S.recipes.filter(r=>r.ings.every(i=>{const f=resolveItem(i.n);return f&&f.qty>=i.q;})).length;
+  const btns=[
+    {icon:"🍽️",label:"What Can We Eat?",sub:"See meals ready right now",color:"#2563EB",tab:"meals"},
+    {icon:"🍳",label:"We Just Cooked",sub:"Tap to log & deduct inventory",color:"#16A34A",tab:"meals"},
+    {icon:"📦",label:"View Pantry",sub:"Update quantities",color:"#7C3AED",tab:"pantry"},
+    {icon:"⏰",label:"What's Expiring?",sub:"Use it before you lose it",color:"#DC2626",tab:"alerts"},
+    {icon:"🛒",label:"Shopping List",sub:"What this week still needs",color:"#0D9488",tab:"shop"},
+  ];
+  return`<div class="scroll fade" style="padding:0 16px 16px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;margin-top:4px">
+      ${[{n:S.items.length,l:"items",c:"#3B82F6"},{n:cookable,l:"cookable",c:"#22C55E"},{n:alertCount(),l:"alerts",c:"#EF4444"}].map(s=>`
+        <div style="background:var(--card);border-radius:12px;padding:12px 8px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:${s.c}">${s.n}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">${s.l}</div>
+        </div>`).join("")}
+    </div>
+    ${(urgent.length>0||expiring.length>0)?`<div style="background:#450A0A;border-radius:12px;padding:12px 14px;margin-bottom:16px;border:1px solid #7F1D1D">
+      <div style="font-weight:700;font-size:12px;color:#FCA5A5;margin-bottom:6px">⚠️ NEEDS ATTENTION</div>
+      ${urgent.map(i=>`<div style="font-size:12px;color:#EF4444;margin-bottom:3px">🔥 ${esc(i.name)} — use TODAY</div>`).join("")}
+      ${expiring.map(i=>`<div style="font-size:12px;color:#F97316;margin-bottom:3px">⏰ ${esc(i.name)} — ${daysLeft(i)} day${daysLeft(i)!==1?"s":""} left</div>`).join("")}
+    </div>`:""}
+    ${btns.map(b=>`<button data-action="tab" data-tab="${b.tab}" style="width:100%;margin-bottom:8px;background:${b.color};border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;text-align:left;box-shadow:0 4px 20px ${b.color}33">
+      <span style="font-size:26px">${b.icon}</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:15px;color:#fff">${b.label}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:1px">${b.sub}</div>
+      </div>
+      <span style="color:rgba(255,255,255,.4);font-size:20px">›</span>
+    </button>`).join("")}
+    <div style="background:#14532D;border-radius:10px;padding:10px 14px;margin-top:4px;display:flex;align-items:center;gap:8px">
+      <span>✅</span><span style="font-size:12px;color:#4ADE80;font-weight:600">All meals are Gluten-Free — always safe for Noah</span>
+    </div>
+  </div>`;}
+
+// ── PANTRY ───────────────────────────────────────────────────
+function pantryTab(){
+  const locs=["all","fridge","freezer","pantry"];
+  let filtered=S.items.filter(i=>S.pantryLoc==="all"||i.loc===S.pantryLoc);
+  if(S.pantrySearch)filtered=filtered.filter(i=>i.name.toLowerCase().includes(S.pantrySearch.toLowerCase()));
+  filtered.sort((a,b)=>{const o={expired:0,urgent:1,expiring:2,critical:3,empty:4,low:5,ok:6};return(o[itemStatus(a)]||7)-(o[itemStatus(b)]||7);});
+  return`<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div style="padding:0 16px 10px;flex-shrink:0">
+      <input type="text" placeholder="🔍  Search pantry..." value="${esc(S.pantrySearch)}" data-action="pantry-search" style="margin-bottom:8px">
+      <div style="display:flex;gap:6px">
+        ${locs.map(l=>`<button data-action="pantry-loc" data-loc="${l}" style="flex:1;padding:7px 4px;background:${S.pantryLoc===l?"#2563EB":"var(--card)"};color:${S.pantryLoc===l?"#fff":"var(--t2)"};border-radius:8px;font-size:11px;font-weight:600;border:1px solid ${S.pantryLoc===l?"#2563EB":"var(--border)"}">${l==="all"?"All":(LOC_INFO[l]?.icon+" "+l[0].toUpperCase()+l.slice(1))}</button>`).join("")}
+      </div>
+    </div>
+    <div class="scroll" style="padding:0 16px">
+      ${filtered.length===0?`<div style="text-align:center;padding:40px 0;color:var(--t2)">No items found</div>`:
+        filtered.map(i=>{
+          const st=itemStatus(i);const si=STATUS_INFO[st]||STATUS_INFO.ok;
+          const d=daysLeft(i);const li=LOC_INFO[i.loc]||LOC_INFO.fridge;
+          return`<div style="background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:7px;border-left:3px solid ${CAT_CLR[i.cat]||"#8B949E"};display:flex;align-items:center;gap:10px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:13px;color:#E8EEF8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px">${esc(i.name)}</div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:10px;background:${si.bg};color:${si.txt};padding:2px 7px;border-radius:20px;font-weight:700">${si.label}</span>
+                <span style="font-size:10px;color:${li.color};font-weight:600">${li.icon} ${li.label}</span>
+                ${d!==null&&d<=7?`<span style="font-size:10px;color:${d<=1?"#EF4444":"#F97316"}">${d<=0?"expired":d===1?"1 day":d+" days"}</span>`:""}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <button data-action="dec" data-id="${i.id}" style="width:34px;height:34px;border-radius:50%;background:#7F1D1D;color:#fff;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)">−</button>
+              <div style="text-align:center;min-width:30px">
+                <div style="font-size:18px;font-weight:800;color:#E8EEF8;line-height:1">${i.qty}</div>
+                <div style="font-size:9px;color:var(--t3)">${esc(i.unit)}</div>
+              </div>
+              <button data-action="inc" data-id="${i.id}" style="width:34px;height:34px;border-radius:50%;background:#14532D;color:#fff;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)">+</button>
+            </div>
+          </div>`;}).join("")}
+    </div>
+  </div>`;}
+
+// ── MEALS ────────────────────────────────────────────────────
+function mealsTab(){
+  const catColor={breakfast:"#7C3AED",lunch:"#2563EB",dinner:"#DC2626"};
+  const filtered=S.recipes.filter(r=>r.cat===S.mealTab);
+  return`<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div style="display:flex;gap:6px;padding:0 16px 10px;flex-shrink:0">
+      ${["breakfast","lunch","dinner"].map(t=>`<button data-action="meal-tab" data-mtab="${t}" style="flex:1;padding:9px 4px;background:${S.mealTab===t?catColor[t]:"var(--card)"};color:#fff;border-radius:10px;font-size:11px;font-weight:700;border:1px solid ${S.mealTab===t?"transparent":"var(--border)"}">${{breakfast:"🌅 Breakfast",lunch:"☀️ Lunch",dinner:"🌙 Dinner"}[t]}</button>`).join("")}
+    </div>
+    <div class="scroll" style="padding:0 16px">
+      ${filtered.map(r=>{
+        const ings=r.ings.map(i=>{const f=resolveItem(i.n);const have=f?f.qty:0;return{...i,have,ok:have>=i.q};});
+        const allGood=ings.every(i=>i.ok);
+        const cc=catColor[r.cat]||"#3B82F6";
+        return`<div style="background:var(--card);border-radius:14px;margin-bottom:10px;overflow:hidden;border:1px solid ${allGood?"#1A3A25":"var(--border)"}">
+          <div style="background:${cc};padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700;font-size:15px;color:#fff">${esc(r.name)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:2px">${r.gf?"<span style='background:rgba(255,255,255,.2);padding:1px 6px;border-radius:10px;margin-right:5px;font-weight:700'>GF ✓</span>":""}${r.servings} servings</div>
+            </div>
+            ${allGood?"<span style='font-size:22px'>✅</span>":""}
+          </div>
+          <div style="padding:10px 16px">
+            ${ings.map(i=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:${i.ok?"#4ADE80":"#F87171"};border-bottom:1px solid var(--border)">
+              <span>${i.ok?"✓":"✗"} ${esc(i.n)}</span>
+              <span style="color:var(--t2)">${i.have}/${i.q} ${i.u}</span>
+            </div>`).join("")}
+            <button data-action="start-cook" data-rid="${r.id}" style="width:100%;margin-top:10px;padding:11px;background:${allGood?"#16A34A":"#374151"};color:#fff;border-radius:10px;font-size:13px;font-weight:700">${allGood?"🍳 Cook This!":"🍳 Cook Anyway"}</button>
+          </div>
+        </div>`;}).join("")}
+    </div>
+  </div>`;}
+
+// ── SHOP ─────────────────────────────────────────────────────
+function shopTab(){
+  const needed={};
+  S.recipes.forEach(r=>{
+    r.ings.forEach(i=>{
+      const f=resolveItem(i.n);
+      const have=f?f.qty:0;
+      const need=Math.max(0,i.q-have);
+      if(need>0){
+        const k=(f?.name||i.n).toLowerCase();
+        if(needed[k])needed[k].need+=need;
+        else needed[k]={name:f?.name||i.n,need,unit:i.u,price:f?.price||0};
+      }
+    });
+  });
+  const list=Object.values(needed).sort((a,b)=>b.need-a.need);
+  const total=list.filter(i=>!S.shopBought[i.name]).reduce((s,i)=>s+(i.price||0),0);
+  return`<div class="scroll fade" style="padding:0 16px 16px">
+    <div style="background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ESTIMATED TOTAL</div><div style="font-size:26px;font-weight:800;color:#22C55E">$${total.toFixed(2)}</div></div>
+      <div style="text-align:right"><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ITEMS NEEDED</div><div style="font-size:26px;font-weight:800;color:#3B82F6">${list.length}</div></div>
+    </div>
+    ${list.length===0?`<div style="text-align:center;padding:40px 0;color:var(--t2)">🎉 Fully stocked for this week!</div>`:
+      list.map(i=>{const bought=S.shopBought[i.name];return`<div data-action="toggle-bought" data-item="${esc(i.name)}" style="background:${bought?"#0F2A1A":"var(--card)"};border-radius:12px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;border:1px solid ${bought?"#166534":"var(--border)"};opacity:${bought?.6:1}">
+        <div style="width:24px;height:24px;border-radius:6px;border:2px solid ${bought?"#22C55E":"var(--border)"};background:${bought?"#22C55E":"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          ${bought?"<span style='color:#fff;font-size:14px;font-weight:700'>✓</span>":""}
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px;color:#E8EEF8;text-decoration:${bought?"line-through":"none"}">${esc(i.name)}</div>
+          <div style="font-size:11px;color:var(--t2)">Need ${i.need} ${esc(i.unit)}${i.price>0?" · Costco est.":""}</div>
+        </div>
+        ${i.price>0?`<div style="font-weight:700;color:#22C55E;font-size:14px">$${i.price.toFixed(2)}</div>`:""}
+      </div>`;}).join("")}
+  </div>`;}
+
+// ── ALERTS ───────────────────────────────────────────────────
+function alertsTab(){
+  const exp   =S.items.filter(i=>itemStatus(i)==="expired"&&i.qty>0);
+  const urg   =S.items.filter(i=>itemStatus(i)==="urgent"&&i.qty>0);
+  const soon  =S.items.filter(i=>itemStatus(i)==="expiring"&&i.qty>0);
+  const reord =S.items.filter(i=>i.qty<=i.low&&i.low>0&&i.qty>0&&!["expired","urgent","expiring"].includes(itemStatus(i)));
+  function section(title,color,list,subFn){
+    if(!list.length)return"";
+    return`<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;letter-spacing:.06em">${title}</div>
+      ${list.map(i=>{const d=daysLeft(i);return`<div style="background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:6px;border-left:3px solid ${color};display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:#E8EEF8">${esc(i.name)}</div>
+          <div style="font-size:11px;color:${color};margin-top:2px">${subFn(i,d)}</div>
+        </div>
+        <div style="text-align:right;font-weight:700;font-size:16px;color:#E8EEF8">${i.qty} <span style="font-size:10px;color:var(--t2)">${esc(i.unit)}</span></div>
+      </div>`;}).join("")}
+    </div>`;}
+  const total=exp.length+urg.length+soon.length+reord.length;
+  return`<div class="scroll fade" style="padding:0 16px">
+    ${total===0?`<div style="text-align:center;padding:60px 0"><div style="font-size:48px;margin-bottom:12px">🎉</div><div style="font-size:18px;font-weight:700;color:#22C55E">All clear!</div><div style="color:var(--t2);font-size:13px;margin-top:6px">No alerts right now.</div></div>`:`
+      ${section("💀 EXPIRED — DISCARD NOW","#EF4444",exp,()=>"Past expiry — throw out")}
+      ${section("🔥 USE TODAY OR TOMORROW","#F97316",urg,(i,d)=>d<=0?"Expired today":"Expires tomorrow")}
+      ${section("⏰ USE WITHIN 3 DAYS","#EAB308",soon,(i,d)=>`${d} day${d!==1?"s":""} remaining`)}
+      ${section("🛒 REORDER SOON","#3B82F6",reord,i=>`${i.qty} ${i.unit} left — below reorder level`)}`}
+  </div>`;}
+
+// ═══════════════════════════════════════════════
+// MAIN RENDER
+// ═══════════════════════════════════════════════
+function render(){
+  const ac=alertCount();
+  let content="";
+  if(S.tab==="home")   content=homeTab();
+  if(S.tab==="pantry") content=pantryTab();
+  if(S.tab==="meals")  content=mealsTab();
+  if(S.tab==="shop")   content=shopTab();
+  if(S.tab==="alerts") content=alertsTab();
+
+  document.getElementById("app").innerHTML=`
+    ${header()}
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding-top:8px">${content}</div>
+    ${bottomNav()}
+    ${S.toast?toast(S.toast):""}
+    ${S.cooking?cookModal():""}
+  `;
+  attachEvents();
+}
+
+// ═══════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════
+function showToast(msg){
+  if(toastTimer)clearTimeout(toastTimer);
+  setState({toast:msg});
+  toastTimer=setTimeout(()=>setState({toast:null}),2800);
+}
+
+function attachEvents(){
+  // Search input
+  const si=document.querySelector("[data-action='pantry-search']");
+  if(si){
+    si.addEventListener("input",e=>{S.pantrySearch=e.target.value;render();});
+    si.addEventListener("focus",e=>e.preventDefault());
+  }
+
+  // All button clicks via delegation
+  document.getElementById("app").addEventListener("click",handleClick,{once:true});
+}
+
+function handleClick(e){
+  const btn=e.target.closest("[data-action]");
+  if(!btn)return;
+  const action=btn.dataset.action;
+
+  if(action==="tab"){setState({tab:btn.dataset.tab});}
+  else if(action==="meal-tab"){setState({mealTab:btn.dataset.mtab});}
+  else if(action==="pantry-loc"){setState({pantryLoc:btn.dataset.loc});}
+  else if(action==="inc"){
+    const updated=S.items.map(i=>i.id===btn.dataset.id?{...i,qty:parseFloat((i.qty+1).toFixed(2)),addedDate:now()}:i);
+    setState({items:updated});saveItems();
+  }
+  else if(action==="dec"){
+    const updated=S.items.map(i=>i.id===btn.dataset.id?{...i,qty:Math.max(0,parseFloat((i.qty-1).toFixed(2)))}:i);
+    const item=updated.find(i=>i.id===btn.dataset.id);
+    setState({items:updated});saveItems();
+    if(item&&item.qty===0)showToast("📦 "+item.name+" is empty");
+  }
+  else if(action==="start-cook"){
+    const recipe=S.recipes.find(r=>r.id===btn.dataset.rid);
+    if(!recipe)return;
+    const ings=recipe.ings.map(i=>{const f=resolveItem(i.n);const have=f?f.qty:0;return{...i,have,ok:have>=i.q};});
+    setState({cooking:{recipe,ings}});
+  }
+  else if(action==="close-modal"){setState({cooking:null});}
+  else if(action==="confirm-cook"){
+    const {recipe,ings}=S.cooking;
+    let updated=[...S.items];
+    ings.forEach(i=>{
+      const f=resolveItem(i.n);
+      if(f)updated=updated.map(p=>p.id===f.id?{...p,qty:Math.max(0,parseFloat((p.qty-i.q).toFixed(2)))}:p);
+    });
+    saveItems();
+    setState({items:updated,cooking:null});
+    showToast("🍳 Cooked "+recipe.name+"!");
+  }
+  else if(action==="toggle-bought"){
+    const name=btn.dataset.item;
+    const nb={...S.shopBought,[name]:!S.shopBought[name]};
+    setState({shopBought:nb});
+  }
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+function init(){
+  let items,recipes;
+  try{items=JSON.parse(localStorage.getItem("fk-items"));}catch{}
+  try{recipes=JSON.parse(localStorage.getItem("fk-recipes"));}catch{}
+  S.items=items&&items.length>0?items:DEFAULT_ITEMS;
+  S.recipes=recipes&&recipes.length>0?recipes:DEFAULT_RECIPES;
+  if(!items||!items.length)saveItems();
+  if(!recipes||!recipes.length)saveRecipes();
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
