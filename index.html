@@ -187,7 +187,7 @@ function cookModal(){
   const {recipe,ings}=S.cooking;
   const allGood=ings.every(i=>i.ok);
   return`<div data-action="close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
-    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid var(--border);border-bottom:none">
+    <div data-action="noop" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid var(--border);border-bottom:none">
       <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:3px">${esc(recipe.name)}</div>
       <div style="font-size:11px;color:var(--t2);margin-bottom:14px">Tap COOK to deduct from pantry</div>
       <div style="margin-bottom:14px">
@@ -207,7 +207,7 @@ function cookModal(){
 function undoMealModal(){
   const e=S.undoMeal;
   return`<div data-action="close-undo" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
-    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid var(--border);border-bottom:none">
+    <div data-action="noop" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid var(--border);border-bottom:none">
       <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:4px">↩ Undo "${esc(e.recipeName)}"?</div>
       <div style="font-size:12px;color:var(--t2);margin-bottom:14px">These ingredients will be added back to your pantry:</div>
       <div style="margin-bottom:16px">
@@ -249,7 +249,7 @@ function addItemModal(){
   const inp="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;width:100%;outline:none";
   const lbl="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px;letter-spacing:.05em";
   return`<div data-action="close-add-item" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
-    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
+    <div data-action="noop" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
       <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">➕ Add Pantry Item</div>
       <div style="margin-bottom:10px"><div style="${lbl}">ITEM NAME *</div>
         <input id="ai-name" type="text" placeholder="e.g. Chicken Breast" value="${esc(f.name)}" style="${inp}"></div>
@@ -287,7 +287,7 @@ function addMealModal(){
   const lbl="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px;letter-spacing:.05em";
   const itemNames=S.items.map(i=>i.name);
   return`<div data-action="close-add-meal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
-    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
+    <div data-action="noop" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
       <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">🍽️ Add New Meal</div>
       <div style="margin-bottom:10px"><div style="${lbl}">MEAL NAME *</div>
         <input id="am-name" type="text" placeholder="e.g. Chicken Stir Fry" value="${esc(f.name)}" style="${inp}"></div>
@@ -647,13 +647,11 @@ function attachEvents(){
    ["am-name",v=>{if(S.addMeal)S.addMeal.name=v;}]
   ].forEach(([id,fn])=>{const el=document.getElementById(id);if(el)el.addEventListener("input",e=>fn(e.target.value));});
 
-  // All button clicks via delegation
-  document.getElementById("app").addEventListener("click",handleClick,{once:true});
 }
 
 function handleClick(e){
   const btn=e.target.closest("[data-action]");
-  if(!btn)return;
+  if(!btn||btn.dataset.action==="noop")return;
   const action=btn.dataset.action;
 
   if(action==="tab"){setState({tab:btn.dataset.tab});}
@@ -800,6 +798,7 @@ function init(){
   if(!recipes||!recipes.length)saveRecipes();
   if(!plan)saveWeekPlan();
   render();
+  document.getElementById("app").addEventListener("click",handleClick);
 }
 
 init();
