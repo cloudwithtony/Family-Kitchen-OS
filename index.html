@@ -118,7 +118,7 @@ const DEFAULT_RECIPES=[
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let S={items:[],recipes:[],tab:"home",pantrySearch:"",pantryLoc:"all",mealTab:"breakfast",cooking:null,shopBought:{}};
+let S={items:[],recipes:[],tab:"home",pantrySearch:"",pantryLoc:"all",mealTab:"breakfast",cooking:null,shopBought:{},addItem:null,addMeal:null};
 let toastTimer=null;
 
 function setState(u,skipRender=false){
@@ -197,6 +197,107 @@ function cookModal(){
     </div>
   </div>`;}
 
+// ── SYNC HELPERS ─────────────────────────────────────────────
+function syncAddItemFromDOM(){
+  if(!S.addItem)return;
+  const g=id=>document.getElementById(id);
+  if(g("ai-name"))S.addItem.name=g("ai-name").value;
+  if(g("ai-qty"))S.addItem.qty=parseFloat(g("ai-qty").value)||0;
+  if(g("ai-unit"))S.addItem.unit=g("ai-unit").value;
+  if(g("ai-exp"))S.addItem.expDays=parseInt(g("ai-exp").value)||0;
+  if(g("ai-price"))S.addItem.price=parseFloat(g("ai-price").value)||0;
+  if(g("ai-low"))S.addItem.low=parseInt(g("ai-low").value)||0;
+}
+function syncAddMealFromDOM(){
+  if(!S.addMeal)return;
+  const g=id=>document.getElementById(id);
+  if(g("am-name"))S.addMeal.name=g("am-name").value;
+  if(g("am-servings"))S.addMeal.servings=parseInt(g("am-servings").value)||1;
+}
+
+// ── ADD ITEM MODAL ────────────────────────────────────────────
+function addItemModal(){
+  const f=S.addItem;
+  const cats=["protein","dairy","produce","frozen","pantry","snack","other"];
+  const locs=["fridge","freezer","pantry"];
+  const inp="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;width:100%;outline:none";
+  const lbl="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px;letter-spacing:.05em";
+  return`<div data-action="close-add-item" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
+    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
+      <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">➕ Add Pantry Item</div>
+      <div style="margin-bottom:10px"><div style="${lbl}">ITEM NAME *</div>
+        <input id="ai-name" type="text" placeholder="e.g. Chicken Breast" value="${esc(f.name)}" style="${inp}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><div style="${lbl}">QTY</div><input id="ai-qty" type="number" min="0" step="0.5" value="${f.qty}" style="${inp}"></div>
+        <div><div style="${lbl}">UNIT</div><input id="ai-unit" type="text" placeholder="lbs, count, bags…" value="${esc(f.unit)}" style="${inp}"></div>
+      </div>
+      <div style="margin-bottom:10px"><div style="${lbl}">LOCATION</div>
+        <div style="display:flex;gap:6px">
+          ${locs.map(l=>`<button data-action="ai-loc" data-loc="${l}" style="flex:1;padding:8px 4px;background:${f.loc===l?LOC_INFO[l].color+"44":"var(--card2)"};border:1px solid ${f.loc===l?LOC_INFO[l].color:"var(--border)"};border-radius:8px;color:${f.loc===l?"#fff":"var(--t2)"};font-size:11px;font-weight:600">${LOC_INFO[l].icon} ${LOC_INFO[l].label}</button>`).join("")}
+        </div>
+      </div>
+      <div style="margin-bottom:10px"><div style="${lbl}">CATEGORY</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${cats.map(c=>`<button data-action="ai-cat" data-cat="${c}" style="padding:6px 10px;background:${f.cat===c?CAT_CLR[c]+"33":"var(--card2)"};border:1px solid ${f.cat===c?CAT_CLR[c]:"var(--border)"};border-radius:20px;color:${f.cat===c?CAT_CLR[c]:"var(--t2)"};font-size:11px;font-weight:600">${c}</button>`).join("")}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+        <div><div style="${lbl}">EXPIRES (DAYS)</div><input id="ai-exp" type="number" min="0" value="${f.expDays}" style="${inp}"></div>
+        <div><div style="${lbl}">PRICE ($)</div><input id="ai-price" type="number" min="0" step="0.01" value="${f.price}" style="${inp}"></div>
+        <div><div style="${lbl}">LOW AT</div><input id="ai-low" type="number" min="0" value="${f.low}" style="${inp}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-add-item" style="padding:13px;background:var(--card2);color:var(--t1);border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-item" style="padding:13px;background:#2563EB;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Add Item ✓</button>
+      </div>
+    </div>
+  </div>`;}
+
+// ── ADD MEAL MODAL ────────────────────────────────────────────
+function addMealModal(){
+  const f=S.addMeal;
+  const catColor={breakfast:"#7C3AED",lunch:"#2563EB",dinner:"#DC2626"};
+  const inp="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;width:100%;outline:none";
+  const lbl="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px;letter-spacing:.05em";
+  const itemNames=S.items.map(i=>i.name);
+  return`<div data-action="close-add-meal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
+    <div onclick="event.stopPropagation()" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
+      <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">🍽️ Add New Meal</div>
+      <div style="margin-bottom:10px"><div style="${lbl}">MEAL NAME *</div>
+        <input id="am-name" type="text" placeholder="e.g. Chicken Stir Fry" value="${esc(f.name)}" style="${inp}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><div style="${lbl}">SERVINGS</div><input id="am-servings" type="number" min="1" value="${f.servings}" style="${inp}"></div>
+        <div><div style="${lbl}">GLUTEN-FREE</div>
+          <button data-action="am-gf" style="width:100%;padding:10px 12px;background:${f.gf?"#14532D":"var(--card2)"};border:1px solid ${f.gf?"#22C55E":"var(--border)"};border-radius:10px;color:${f.gf?"#4ADE80":"var(--t2)"};font-size:13px;font-weight:700">${f.gf?"✓ GF":"✗ Not GF"}</button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px"><div style="${lbl}">CATEGORY</div>
+        <div style="display:flex;gap:6px">
+          ${["breakfast","lunch","dinner"].map(t=>`<button data-action="am-cat" data-cat="${t}" style="flex:1;padding:8px 4px;background:${f.cat===t?catColor[t]:"var(--card2)"};border:1px solid ${f.cat===t?catColor[t]:"var(--border)"};border-radius:8px;color:#fff;font-size:11px;font-weight:700">${{breakfast:"🌅 Breakfast",lunch:"☀️ Lunch",dinner:"🌙 Dinner"}[t]}</button>`).join("")}
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="${lbl}">INGREDIENTS (${f.ings.length})</div>
+        ${f.ings.map((ing,idx)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;background:var(--card2);border-radius:10px;padding:8px 10px;border:1px solid var(--border)">
+          <div style="flex:1;font-size:13px;color:#E8EEF8;font-weight:600">${esc(ing.n)}</div>
+          <div style="font-size:12px;color:var(--t2);white-space:nowrap">${ing.q} ${esc(ing.u)}</div>
+          <button data-action="remove-ing" data-idx="${idx}" style="width:26px;height:26px;border-radius:50%;background:#450A0A;color:#F87171;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1">×</button>
+        </div>`).join("")}
+        <datalist id="ing-list">${itemNames.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+        <input id="am-ing-name" list="ing-list" type="text" placeholder="Ingredient name…" style="${inp};margin-bottom:6px">
+        <div style="display:flex;gap:6px">
+          <input id="am-ing-qty" type="number" min="0.1" step="0.25" value="1" placeholder="Qty" style="${inp};width:80px;flex-shrink:0">
+          <input id="am-ing-unit" type="text" placeholder="unit" style="${inp};flex:1">
+          <button data-action="add-ing" style="padding:10px 14px;background:#2563EB;color:#fff;border-radius:10px;font-size:13px;font-weight:700;flex-shrink:0;white-space:nowrap">+ Add</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+        <button data-action="close-add-meal" style="padding:13px;background:var(--card2);color:var(--t1);border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-meal" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Save Meal ✓</button>
+      </div>
+    </div>
+  </div>`;}
+
 // ── HOME ─────────────────────────────────────────────────────
 function homeTab(){
   const urgent=S.items.filter(i=>["urgent","expired"].includes(itemStatus(i))&&i.qty>0);
@@ -243,7 +344,10 @@ function pantryTab(){
   filtered.sort((a,b)=>{const o={expired:0,urgent:1,expiring:2,critical:3,empty:4,low:5,ok:6};return(o[itemStatus(a)]||7)-(o[itemStatus(b)]||7);});
   return`<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
     <div style="padding:0 16px 10px;flex-shrink:0">
-      <input type="text" placeholder="🔍  Search pantry..." value="${esc(S.pantrySearch)}" data-action="pantry-search" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <input type="text" placeholder="🔍  Search pantry..." value="${esc(S.pantrySearch)}" data-action="pantry-search" style="flex:1;min-width:0;margin-bottom:0">
+        <button data-action="open-add-item" style="flex-shrink:0;padding:10px 14px;background:#2563EB;color:#fff;border-radius:12px;font-size:13px;font-weight:700">+ Add</button>
+      </div>
       <div style="display:flex;gap:6px">
         ${locs.map(l=>`<button data-action="pantry-loc" data-loc="${l}" style="flex:1;padding:7px 4px;background:${S.pantryLoc===l?"#2563EB":"var(--card)"};color:${S.pantryLoc===l?"#fff":"var(--t2)"};border-radius:8px;font-size:11px;font-weight:600;border:1px solid ${S.pantryLoc===l?"#2563EB":"var(--border)"}">${l==="all"?"All":(LOC_INFO[l]?.icon+" "+l[0].toUpperCase()+l.slice(1))}</button>`).join("")}
       </div>
@@ -279,8 +383,11 @@ function mealsTab(){
   const catColor={breakfast:"#7C3AED",lunch:"#2563EB",dinner:"#DC2626"};
   const filtered=S.recipes.filter(r=>r.cat===S.mealTab);
   return`<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
-    <div style="display:flex;gap:6px;padding:0 16px 10px;flex-shrink:0">
-      ${["breakfast","lunch","dinner"].map(t=>`<button data-action="meal-tab" data-mtab="${t}" style="flex:1;padding:9px 4px;background:${S.mealTab===t?catColor[t]:"var(--card)"};color:#fff;border-radius:10px;font-size:11px;font-weight:700;border:1px solid ${S.mealTab===t?"transparent":"var(--border)"}">${{breakfast:"🌅 Breakfast",lunch:"☀️ Lunch",dinner:"🌙 Dinner"}[t]}</button>`).join("")}
+    <div style="padding:0 16px 0;flex-shrink:0">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        ${["breakfast","lunch","dinner"].map(t=>`<button data-action="meal-tab" data-mtab="${t}" style="flex:1;padding:9px 4px;background:${S.mealTab===t?catColor[t]:"var(--card)"};color:#fff;border-radius:10px;font-size:11px;font-weight:700;border:1px solid ${S.mealTab===t?"transparent":"var(--border)"}">${{breakfast:"🌅 Breakfast",lunch:"☀️ Lunch",dinner:"🌙 Dinner"}[t]}</button>`).join("")}
+      </div>
+      <button data-action="open-add-meal" style="width:100%;padding:10px;background:var(--card);border:1px dashed var(--border);border-radius:10px;color:var(--t2);font-size:13px;font-weight:700;margin-bottom:10px">🍽️ + Create New Meal</button>
     </div>
     <div class="scroll" style="padding:0 16px">
       ${filtered.map(r=>{
@@ -386,6 +493,8 @@ function render(){
     ${bottomNav()}
     ${S.toast?toast(S.toast):""}
     ${S.cooking?cookModal():""}
+    ${S.addItem?addItemModal():""}
+    ${S.addMeal?addMealModal():""}
   `;
   attachEvents();
 }
@@ -406,6 +515,12 @@ function attachEvents(){
     si.addEventListener("input",e=>{S.pantrySearch=e.target.value;render();});
     si.addEventListener("focus",e=>e.preventDefault());
   }
+
+  // Keep modal text fields synced to state without re-rendering
+  [["ai-name",v=>{if(S.addItem)S.addItem.name=v;}],
+   ["ai-unit",v=>{if(S.addItem)S.addItem.unit=v;}],
+   ["am-name",v=>{if(S.addMeal)S.addMeal.name=v;}]
+  ].forEach(([id,fn])=>{const el=document.getElementById(id);if(el)el.addEventListener("input",e=>fn(e.target.value));});
 
   // All button clicks via delegation
   document.getElementById("app").addEventListener("click",handleClick,{once:true});
@@ -451,6 +566,69 @@ function handleClick(e){
     const name=btn.dataset.item;
     const nb={...S.shopBought,[name]:!S.shopBought[name]};
     setState({shopBought:nb});
+  }
+  // ── Add Item actions ──────────────────────────────────────
+  else if(action==="open-add-item"){
+    setState({addItem:{name:"",qty:1,unit:"count",loc:"fridge",cat:"other",expDays:7,price:0,low:0}});
+  }
+  else if(action==="close-add-item"){setState({addItem:null});}
+  else if(action==="ai-loc"){
+    syncAddItemFromDOM();S.addItem.loc=btn.dataset.loc;render();
+  }
+  else if(action==="ai-cat"){
+    syncAddItemFromDOM();S.addItem.cat=btn.dataset.cat;render();
+  }
+  else if(action==="save-item"){
+    syncAddItemFromDOM();
+    const f=S.addItem;
+    if(!f.name.trim()){showToast("⚠️ Item name is required");return;}
+    const newId="u"+Date.now().toString(36);
+    const newItem=mkItem(newId,f.name.trim(),parseFloat(f.qty)||0,f.unit.trim()||"count",f.loc,f.cat,parseInt(f.expDays)||0,parseFloat(f.price)||0,parseInt(f.low)||0,0);
+    const updated=[...S.items,newItem];
+    saveItems();
+    setState({items:updated,addItem:null});
+    showToast("✅ "+f.name.trim()+" added to pantry!");
+  }
+  // ── Add Meal actions ──────────────────────────────────────
+  else if(action==="open-add-meal"){
+    setState({addMeal:{name:"",cat:"dinner",servings:4,gf:true,ings:[]}});
+  }
+  else if(action==="close-add-meal"){setState({addMeal:null});}
+  else if(action==="am-cat"){
+    syncAddMealFromDOM();S.addMeal.cat=btn.dataset.cat;render();
+  }
+  else if(action==="am-gf"){
+    syncAddMealFromDOM();S.addMeal.gf=!S.addMeal.gf;render();
+  }
+  else if(action==="add-ing"){
+    syncAddMealFromDOM();
+    const ingName=(document.getElementById("am-ing-name")?.value||"").trim();
+    const ingQty=parseFloat(document.getElementById("am-ing-qty")?.value)||1;
+    let ingUnit=(document.getElementById("am-ing-unit")?.value||"").trim();
+    if(!ingName){showToast("⚠️ Enter an ingredient name");return;}
+    if(!ingUnit){
+      const found=S.items.find(i=>i.name.toLowerCase()===ingName.toLowerCase());
+      ingUnit=found?found.unit:"count";
+    }
+    S.addMeal.ings.push({n:ingName,q:ingQty,u:ingUnit});
+    render();
+  }
+  else if(action==="remove-ing"){
+    syncAddMealFromDOM();
+    S.addMeal.ings.splice(parseInt(btn.dataset.idx),1);
+    render();
+  }
+  else if(action==="save-meal"){
+    syncAddMealFromDOM();
+    const f=S.addMeal;
+    if(!f.name.trim()){showToast("⚠️ Meal name is required");return;}
+    if(!f.ings.length){showToast("⚠️ Add at least one ingredient");return;}
+    const newId="r"+Date.now().toString(36);
+    const newRecipe={id:newId,name:f.name.trim(),gf:f.gf,cat:f.cat,servings:parseInt(f.servings)||1,ings:f.ings};
+    const updated=[...S.recipes,newRecipe];
+    saveRecipes();
+    setState({recipes:updated,addMeal:null,mealTab:f.cat});
+    showToast("🍽️ "+f.name.trim()+" added to meals!");
   }
 }
 
