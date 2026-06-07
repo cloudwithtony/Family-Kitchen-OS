@@ -38,8 +38,13 @@ const CAT_CLR={protein:"#EF4444",dairy:"#EAB308",produce:"#22C55E",frozen:"#14B8
 const LOC_INFO={fridge:{icon:"🧊",color:"#3B82F6",label:"Fridge"},freezer:{icon:"❄️",color:"#14B8A6",label:"Freezer"},pantry:{icon:"🏠",color:"#F97316",label:"Pantry"}};
 const STATUS_INFO={ok:{bg:"#14532D",txt:"#4ADE80",label:"✓ Good"},low:{bg:"#422006",txt:"#FB923C",label:"⚡ Low"},critical:{bg:"#450A0A",txt:"#F87171",label:"🔴 Critical"},expiring:{bg:"#431407",txt:"#FB923C",label:"⏰ Soon"},urgent:{bg:"#450A0A",txt:"#EF4444",label:"🔥 Today"},expired:{bg:"#1C1917",txt:"#78716C",label:"💀 Expired"},empty:{bg:"#111827",txt:"#6B7280",label:"📦 Empty"}};
 
+const DAYS=["mon","tue","wed","thu","fri","sat","sun"];
+const DAY_LABELS={mon:"Monday",tue:"Tuesday",wed:"Wednesday",thu:"Thursday",fri:"Friday",sat:"Saturday",sun:"Sunday"};
+const FAMILY_SIZE=5;
+
 const now=()=>new Date().toISOString();
 function mkItem(id,name,qty,unit,loc,cat,expDays,price=0,low=0,crit=0){return{id,name,qty,unit,loc,cat,expDays,addedDate:now(),price,low,crit};}
+function emptyPlan(){const p={};DAYS.forEach(d=>{p[d]={breakfast:null,lunch:null,dinner:null};});return p;}
 
 const DEFAULT_ITEMS=[
   mkItem("a01","Eggs (Goldhen Brown)",12,"count","fridge","dairy",35,8.99,6,3),
@@ -118,7 +123,7 @@ const DEFAULT_RECIPES=[
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let S={items:[],recipes:[],tab:"home",pantrySearch:"",pantryLoc:"all",mealTab:"breakfast",cooking:null,shopBought:{},addItem:null,addMeal:null};
+let S={items:[],recipes:[],tab:"home",pantrySearch:"",pantryLoc:"all",mealTab:"breakfast",cooking:null,shopBought:{},addItem:null,addMeal:null,weekPlan:null};
 let toastTimer=null;
 
 function setState(u,skipRender=false){
@@ -127,6 +132,7 @@ function setState(u,skipRender=false){
 }
 function saveItems(){try{localStorage.setItem("fk-items",JSON.stringify(S.items));}catch{}}
 function saveRecipes(){try{localStorage.setItem("fk-recipes",JSON.stringify(S.recipes));}catch{}}
+function saveWeekPlan(){try{localStorage.setItem("fk-plan",JSON.stringify(S.weekPlan));}catch{}}
 
 // ═══════════════════════════════════════════════
 // HELPERS
@@ -165,11 +171,11 @@ function header(){
   </div>`;}
 
 function bottomNav(){
-  const tabs=[{id:"home",icon:"🏠",label:"Home"},{id:"pantry",icon:"📦",label:"Pantry"},{id:"meals",icon:"🍽️",label:"Meals"},{id:"shop",icon:"🛒",label:"Shop"},{id:"alerts",icon:"⏰",label:alertCount()>0?`(${alertCount()})`:"Alerts"}];
+  const tabs=[{id:"home",icon:"🏠",label:"Home"},{id:"pantry",icon:"📦",label:"Pantry"},{id:"meals",icon:"🍽️",label:"Meals"},{id:"plan",icon:"📅",label:"Plan"},{id:"shop",icon:"🛒",label:"Shop"},{id:"alerts",icon:"⏰",label:alertCount()>0?`(${alertCount()})`:"Alerts"}];
   return`<div style="background:#0A0E18;border-top:1px solid var(--border);display:flex;padding:8px 0 12px;flex-shrink:0">
     ${tabs.map(t=>`<button data-action="tab" data-tab="${t.id}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:transparent;padding:4px 0;opacity:${S.tab===t.id?1:.4}">
-      <span style="font-size:22px;line-height:1">${t.icon}</span>
-      <span style="font-size:9px;font-weight:${S.tab===t.id?700:500};color:${S.tab===t.id?"#3B82F6":"#8B949E"}">${t.label}</span>
+      <span style="font-size:20px;line-height:1">${t.icon}</span>
+      <span style="font-size:8px;font-weight:${S.tab===t.id?700:500};color:${S.tab===t.id?"#3B82F6":"#8B949E"}">${t.label}</span>
     </button>`).join("")}
   </div>`;}
 
@@ -413,36 +419,90 @@ function mealsTab(){
     </div>
   </div>`;}
 
+// ── PLAN ─────────────────────────────────────────────────────
+function planTab(){
+  const mealIcon={breakfast:"🌅",lunch:"☀️",dinner:"🌙"};
+  const mealLabel={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner"};
+  const planCount=DAYS.reduce((n,d)=>n+["breakfast","lunch","dinner"].filter(m=>S.weekPlan[d][m]).length,0);
+  const sel="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 8px;font-size:12px;width:100%;outline:none;appearance:none;-webkit-appearance:none";
+  function recipeOpts(selId){
+    const groups=["breakfast","lunch","dinner"];
+    const gLabel={breakfast:"🌅 Breakfast",lunch:"☀️ Lunch",dinner:"🌙 Dinner"};
+    return`<option value="">— skip —</option>`+groups.map(g=>{
+      const recs=S.recipes.filter(r=>r.cat===g);
+      if(!recs.length)return"";
+      return`<optgroup label="${gLabel[g]}">${recs.map(r=>`<option value="${r.id}"${r.id===selId?" selected":""}>${esc(r.name)}</option>`).join("")}</optgroup>`;
+    }).join("");
+  }
+  return`<div class="scroll fade" style="padding:0 16px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:4px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#E8EEF8">${planCount} of 21 meals planned</div>
+        <div style="font-size:10px;color:var(--t2);margin-top:2px">👨‍👩‍👧‍👦 Feeding ${FAMILY_SIZE} people</div>
+      </div>
+      <button data-action="clear-plan" style="padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:11px;font-weight:600">Clear All</button>
+    </div>
+    ${DAYS.map(d=>`<div style="background:var(--card);border-radius:14px;margin-bottom:8px;overflow:hidden;border:1px solid var(--border)">
+      <div style="background:var(--card2);padding:9px 14px;font-size:12px;font-weight:800;color:#E8EEF8;border-bottom:1px solid var(--border)">${DAY_LABELS[d]}</div>
+      ${["breakfast","lunch","dinner"].map(m=>`<div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+        <span style="font-size:15px;flex-shrink:0">${mealIcon[m]}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:9px;font-weight:700;color:var(--t2);margin-bottom:3px;letter-spacing:.04em">${mealLabel[m].toUpperCase()}</div>
+          <select data-action="plan-select" data-day="${d}" data-meal="${m}" style="${sel}">${recipeOpts(S.weekPlan[d][m])}</select>
+        </div>
+      </div>`).join("")}
+    </div>`).join("")}
+    <button data-action="goto-shop" style="width:100%;padding:14px;background:#0D9488;color:#fff;border-radius:14px;font-size:14px;font-weight:700;margin-top:4px;box-shadow:0 4px 20px #0D948833">🛒 Generate Shopping List</button>
+  </div>`;}
+
 // ── SHOP ─────────────────────────────────────────────────────
 function shopTab(){
   const needed={};
-  S.recipes.forEach(r=>{
-    r.ings.forEach(i=>{
-      const f=resolveItem(i.n);
-      const have=f?f.qty:0;
-      const need=Math.max(0,i.q-have);
-      if(need>0){
-        const k=(f?.name||i.n).toLowerCase();
-        if(needed[k])needed[k].need+=need;
-        else needed[k]={name:f?.name||i.n,need,unit:i.u,price:f?.price||0};
-      }
+  let hasPlan=false;
+  DAYS.forEach(d=>{
+    ["breakfast","lunch","dinner"].forEach(m=>{
+      const rid=S.weekPlan[d][m];
+      if(!rid)return;
+      hasPlan=true;
+      const recipe=S.recipes.find(r=>r.id===rid);
+      if(!recipe)return;
+      const mult=FAMILY_SIZE/(recipe.servings||1);
+      recipe.ings.forEach(i=>{
+        const f=resolveItem(i.n);
+        const have=f?f.qty:0;
+        const need=Math.max(0,parseFloat((i.q*mult-have).toFixed(2)));
+        if(need>0){
+          const k=(f?.name||i.n).toLowerCase();
+          if(needed[k])needed[k].need=parseFloat((needed[k].need+need).toFixed(2));
+          else needed[k]={name:f?.name||i.n,need,unit:i.u,price:f?.price||0};
+        }
+      });
     });
   });
-  const list=Object.values(needed).sort((a,b)=>b.need-a.need);
-  const total=list.filter(i=>!S.shopBought[i.name]).reduce((s,i)=>s+(i.price||0),0);
+  if(!hasPlan)return`<div class="scroll fade" style="padding:0 16px">
+    <div style="text-align:center;padding:60px 16px">
+      <div style="font-size:48px;margin-bottom:12px">📅</div>
+      <div style="font-size:16px;font-weight:700;color:#E8EEF8;margin-bottom:8px">No plan yet</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.5">Plan your week's meals first,<br>then hit Generate Shopping List.</div>
+      <button data-action="tab" data-tab="plan" style="padding:12px 24px;background:#0D9488;color:#fff;border-radius:12px;font-size:14px;font-weight:700">📅 Go to Planner</button>
+    </div>
+  </div>`;
+  const list=Object.values(needed).sort((a,b)=>a.name.localeCompare(b.name));
+  const hasPrices=list.some(i=>i.price>0&&!S.shopBought[i.name]);
+  const total=list.filter(i=>!S.shopBought[i.name]&&i.price>0).reduce((s,i)=>s+i.price,0);
   return`<div class="scroll fade" style="padding:0 16px 16px">
     <div style="background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
-      <div><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ESTIMATED TOTAL</div><div style="font-size:26px;font-weight:800;color:#22C55E">$${total.toFixed(2)}</div></div>
-      <div style="text-align:right"><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ITEMS NEEDED</div><div style="font-size:26px;font-weight:800;color:#3B82F6">${list.length}</div></div>
+      <div><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ITEMS TO BUY</div><div style="font-size:26px;font-weight:800;color:#3B82F6">${list.length}</div></div>
+      ${hasPrices?`<div style="text-align:right"><div style="font-size:10px;color:var(--t2);margin-bottom:2px">EST. COST</div><div style="font-size:26px;font-weight:800;color:#22C55E">$${total.toFixed(2)}</div></div>`:""}
     </div>
-    ${list.length===0?`<div style="text-align:center;padding:40px 0;color:var(--t2)">🎉 Fully stocked for this week!</div>`:
+    ${list.length===0?`<div style="text-align:center;padding:40px 0;color:var(--t2)">🎉 You have everything for this week!</div>`:
       list.map(i=>{const bought=S.shopBought[i.name];return`<div data-action="toggle-bought" data-item="${esc(i.name)}" style="background:${bought?"#0F2A1A":"var(--card)"};border-radius:12px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;border:1px solid ${bought?"#166534":"var(--border)"};opacity:${bought?.6:1}">
         <div style="width:24px;height:24px;border-radius:6px;border:2px solid ${bought?"#22C55E":"var(--border)"};background:${bought?"#22C55E":"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
           ${bought?"<span style='color:#fff;font-size:14px;font-weight:700'>✓</span>":""}
         </div>
         <div style="flex:1">
           <div style="font-weight:600;font-size:13px;color:#E8EEF8;text-decoration:${bought?"line-through":"none"}">${esc(i.name)}</div>
-          <div style="font-size:11px;color:var(--t2)">Need ${i.need} ${esc(i.unit)}${i.price>0?" · Costco est.":""}</div>
+          <div style="font-size:11px;color:var(--t2)">Need ${i.need} ${esc(i.unit)}</div>
         </div>
         ${i.price>0?`<div style="font-weight:700;color:#22C55E;font-size:14px">$${i.price.toFixed(2)}</div>`:""}
       </div>`;}).join("")}
@@ -484,6 +544,7 @@ function render(){
   if(S.tab==="home")   content=homeTab();
   if(S.tab==="pantry") content=pantryTab();
   if(S.tab==="meals")  content=mealsTab();
+  if(S.tab==="plan")   content=planTab();
   if(S.tab==="shop")   content=shopTab();
   if(S.tab==="alerts") content=alertsTab();
 
@@ -515,6 +576,15 @@ function attachEvents(){
     si.addEventListener("input",e=>{S.pantrySearch=e.target.value;render();});
     si.addEventListener("focus",e=>e.preventDefault());
   }
+
+  // Plan selects — update weekPlan without re-render
+  document.querySelectorAll("[data-action='plan-select']").forEach(sel=>{
+    sel.addEventListener("change",e=>{
+      const {day,meal}=sel.dataset;
+      S.weekPlan[day][meal]=e.target.value||null;
+      saveWeekPlan();
+    });
+  });
 
   // Keep modal text fields synced to state without re-rendering
   [["ai-name",v=>{if(S.addItem)S.addItem.name=v;}],
@@ -567,6 +637,9 @@ function handleClick(e){
     const nb={...S.shopBought,[name]:!S.shopBought[name]};
     setState({shopBought:nb});
   }
+  // ── Plan actions ─────────────────────────────────────────
+  else if(action==="clear-plan"){S.weekPlan=emptyPlan();saveWeekPlan();render();}
+  else if(action==="goto-shop"){setState({tab:"shop"});}
   // ── Add Item actions ──────────────────────────────────────
   else if(action==="open-add-item"){
     setState({addItem:{name:"",qty:1,unit:"count",loc:"fridge",cat:"other",expDays:7,price:0,low:0}});
@@ -639,10 +712,14 @@ function init(){
   let items,recipes;
   try{items=JSON.parse(localStorage.getItem("fk-items"));}catch{}
   try{recipes=JSON.parse(localStorage.getItem("fk-recipes"));}catch{}
+  let plan;
+  try{plan=JSON.parse(localStorage.getItem("fk-plan"));}catch{}
   S.items=items&&items.length>0?items:DEFAULT_ITEMS;
   S.recipes=recipes&&recipes.length>0?recipes:DEFAULT_RECIPES;
+  S.weekPlan=plan||emptyPlan();
   if(!items||!items.length)saveItems();
   if(!recipes||!recipes.length)saveRecipes();
+  if(!plan)saveWeekPlan();
   render();
 }
 
