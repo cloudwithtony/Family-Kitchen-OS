@@ -60,6 +60,15 @@ const SEED_FUNDS=[
 const ACCT_TYPES={checking:'CHECKING',savings:'SAVINGS',hysa:'HI-YIELD',invest:'INVEST',business:'BUSINESS'};
 const ACCT_COLORS={checking:'#3B82F6',savings:'#10B981',hysa:'#06B6D4',invest:'#F59E0B',business:'#8B5CF6'};
 
+const SEED_ACCOUNTS=[
+  {id:'cap1_spend', name:'Spending',          institution:'Capital One',type:'checking',balance:24.63,   last4:'5000',lastUpdated:new Date().toISOString()},
+  {id:'cap1_invest',name:'Investment Account', institution:'Capital One',type:'invest',  balance:2951.04, last4:'8369',lastUpdated:new Date().toISOString()},
+  {id:'cap1_date',  name:'Date Night',         institution:'Capital One',type:'savings', balance:160.09,  last4:'3567',lastUpdated:new Date().toISOString()},
+  {id:'cap1_kids',  name:'Kids\' Fund',        institution:'Capital One',type:'savings', balance:0.60,    last4:'6331',lastUpdated:new Date().toISOString()},
+  {id:'cap1_emerg', name:'Emergency',          institution:'Capital One',type:'savings', balance:312.29,  last4:'8064',lastUpdated:new Date().toISOString()},
+  {id:'cap1_travel',name:'Travel Fund',        institution:'Capital One',type:'savings', balance:205.17,  last4:'8587',lastUpdated:new Date().toISOString()},
+];
+
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
@@ -71,9 +80,15 @@ function initData(){
   return{anthon:1030,lexi:580,
     bills:SEED_BILLS.map(b=>({...b})),
     funds:SEED_FUNDS.map(f=>({...f})),
-    goals:[],weeks:[],accounts:[]};
+    goals:[],weeks:[],accounts:SEED_ACCOUNTS.map(a=>({...a}))};
 }
-function load(){try{return JSON.parse(localStorage.getItem('vf'))||initData();}catch{return initData();}}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('vf'))||initData();
+    if(!d.accounts||d.accounts.length===0){d.accounts=SEED_ACCOUNTS.map(a=>({...a}));save(d);}
+    return d;
+  }catch{return initData();}
+}
 function save(d){try{localStorage.setItem('vf',JSON.stringify(d));}catch{}}
 
 // ══════════════════════════════════════════════════
@@ -414,7 +429,7 @@ function buildAccounts(){
               <span style="font-size:15px;font-weight:700;color:#F0F4FF">${esc(a.name)}</span>
               <span style="font-size:9px;font-weight:700;color:${tc};background:${tc}22;padding:2px 7px;border-radius:4px">${ACCT_TYPES[a.type]||a.type}</span>
             </div>
-            <div style="font-size:11px;color:#4A5D7A">${esc(a.institution||'')}${a.institution?' · ':''}Updated ${timeAgo(a.lastUpdated)}</div>
+            <div style="font-size:11px;color:#4A5D7A">${esc(a.institution||'')}${a.last4?' ···'+a.last4:''}${a.institution?' · ':''}Updated ${timeAgo(a.lastUpdated)}</div>
           </div>
           <button data-action="del-account" data-idx="${i}" style="color:#3A4D66;font-size:20px;background:none;padding:0 4px;line-height:1">×</button>
         </div>
@@ -623,7 +638,7 @@ function buildModal(){
           <div style="width:10px;height:10px;border-radius:50%;background:${tc};flex-shrink:0"></div>
           <div style="flex:1">
             <div style="font-size:13px;font-weight:600;color:#F0F4FF">${esc(a.name)}</div>
-            <div style="font-size:10px;color:#4A5D7A">${ACCT_TYPES[a.type]} · ${$$(a.balance)}</div>
+            <div style="font-size:10px;color:#4A5D7A">${ACCT_TYPES[a.type]}${a.last4?' ···'+a.last4:''} · ${$$(a.balance)}</div>
           </div>
         </button>`;
       }).join('')}
