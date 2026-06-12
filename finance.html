@@ -6,111 +6,179 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Varen Finance">
-<meta name="theme-color" content="#060A12">
+<meta name="theme-color" content="#0B1221">
 <style>html{height:-webkit-fill-available}body{min-height:-webkit-fill-available}</style>
 <title>Varen Finance</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:#060A12;color:#EEF2FF;font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;overflow:hidden}
-#app{height:100%;display:flex;flex-direction:column;max-width:860px;margin:0 auto}
+html,body{height:100%;background:#0B1221;color:#F0F4FF;font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;max-width:900px;margin:0 auto}
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 100px;overscroll-behavior:none}
-.scroll::-webkit-scrollbar{width:4px}
-.scroll::-webkit-scrollbar-thumb{background:#1C2D45;border-radius:4px}
+.scroll::-webkit-scrollbar{width:3px}
+.scroll::-webkit-scrollbar-thumb{background:#1E2D45;border-radius:3px}
 button{cursor:pointer;font-family:inherit;border:none;outline:none}
-button:active{opacity:.75;transform:scale(.97)}
+button:active{opacity:.75;transform:scale(.96)}
 input{font-family:inherit;outline:none;-webkit-appearance:none;border:none}
-@keyframes fd{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.fade{animation:fd .2s ease}
-@media(min-width:700px){.scroll{padding:0 32px 100px}}
+select{font-family:inherit;outline:none;-webkit-appearance:none;border:none;background:none}
+@keyframes fd{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes growBar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.fade{animation:fd .22s ease}
+.spin{animation:spin .7s linear infinite}
+.card{background:linear-gradient(135deg,#111B2E 0%,#0D1526 100%);border:1px solid #1E2D45;border-radius:16px}
+.glow-green{box-shadow:0 0 20px #10B98122}
+.glow-blue{box-shadow:0 0 20px #3B82F622}
+@media(min-width:700px){.scroll{padding:0 28px 100px}}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
 // ══════════════════════════════════════════════════
-// SEED — your actual numbers
+// SEED DATA
 // ══════════════════════════════════════════════════
-const SEED_BILLS = [
-  {id:'rent',     name:'Rent',                  weekly:200},
-  {id:'groc',     name:'Groceries',             weekly:250},
-  {id:'phone',    name:'Phone',                 weekly:52.50},
-  {id:'car_ins',  name:'Car Insurance',         weekly:37.50},
-  {id:'gas',      name:'Gas',                   weekly:25},
-  {id:'gr_fam',   name:'Grooming — You & Boys', weekly:45},
-  {id:'gr_lex',   name:'Grooming — Lexi',       weekly:80},
-  {id:'gr_dau',   name:'Grooming — Daughters',  weekly:10},
-  {id:'subs',     name:'Subscriptions',         weekly:8},
-  {id:'amz_sell', name:'Amazon Seller',         weekly:9.23},
+const SEED_BILLS=[
+  {id:'rent',    name:'Rent',                 weekly:200,  icon:'🏠'},
+  {id:'groc',    name:'Groceries',            weekly:250,  icon:'🛒'},
+  {id:'phone',   name:'Phone',                weekly:52.50,icon:'📱'},
+  {id:'car_ins', name:'Car Insurance',        weekly:37.50,icon:'🚗'},
+  {id:'gas',     name:'Gas',                  weekly:25,   icon:'⛽'},
+  {id:'gr_fam',  name:'Grooming — You & Boys',weekly:45,   icon:'✂️'},
+  {id:'gr_lex',  name:'Grooming — Lexi',      weekly:80,   icon:'💇'},
+  {id:'gr_dau',  name:'Grooming — Daughters', weekly:10,   icon:'🎀'},
+  {id:'subs',    name:'Subscriptions',        weekly:8,    icon:'📺'},
+  {id:'amz',     name:'Amazon Seller',        weekly:9.23, icon:'📦'},
 ];
-const SEED_FUNDS = [
-  {id:'emergency', name:'Emergency Fund', weekly:50,  icon:'🛡️', color:'#2563EB'},
-  {id:'investment',name:'Investment',     weekly:245, icon:'🏗️', color:'#D97706'},
-  {id:'kids',      name:'Kid Fund',       weekly:75,  icon:'🌱', color:'#16A34A'},
-  {id:'date',      name:'Date Night',     weekly:50,  icon:'💙', color:'#7C3AED'},
-  {id:'travel',    name:'Travel Fund',    weekly:50,  icon:'✈️', color:'#0D9488'},
+const SEED_FUNDS=[
+  {id:'emergency',name:'Emergency Fund',weekly:50, icon:'🛡️',color:'#3B82F6',mission:'sec'},
+  {id:'invest',   name:'Investment',    weekly:245,icon:'🏗️',color:'#F59E0B',mission:'wlth'},
+  {id:'kids',     name:'Kid Fund',      weekly:75, icon:'🌱',color:'#10B981',mission:'exp'},
+  {id:'date',     name:'Date Night',    weekly:50, icon:'💙',color:'#8B5CF6',mission:'exp'},
+  {id:'travel',   name:'Travel Fund',   weekly:50, icon:'✈️',color:'#06B6D4',mission:'exp'},
 ];
+const ACCT_TYPES={checking:'CHECKING',savings:'SAVINGS',hysa:'HI-YIELD',invest:'INVEST',business:'BUSINESS'};
+const ACCT_COLORS={checking:'#3B82F6',savings:'#10B981',hysa:'#06B6D4',invest:'#F59E0B',business:'#8B5CF6'};
 
 // ══════════════════════════════════════════════════
-// STATE + PERSISTENCE
+// STATE
 // ══════════════════════════════════════════════════
-let S = {tab:'paycheck', view:null, toast:null};
-let toastTimer = null;
-let eventsReady = false;
+let S={tab:'dash',view:null,toast:null,refreshing:false,lastRefresh:null};
+let toastTimer=null;
+let eventsReady=false;
 
 function initData(){
-  return { anthon:1030, lexi:580,
+  return{anthon:1030,lexi:580,
     bills:SEED_BILLS.map(b=>({...b})),
     funds:SEED_FUNDS.map(f=>({...f})),
-    goals:[], weeks:[] };
+    goals:[],weeks:[],accounts:[]};
 }
-function load(){ try{return JSON.parse(localStorage.getItem('vf'))||initData();}catch{return initData();} }
-function save(d){ try{localStorage.setItem('vf',JSON.stringify(d));}catch{} }
+function load(){try{return JSON.parse(localStorage.getItem('vf'))||initData();}catch{return initData();}}
+function save(d){try{localStorage.setItem('vf',JSON.stringify(d));}catch{}}
 
 // ══════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function $$(n){return '$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function pct(part,total){return total>0?((part/total)*100).toFixed(1):'0.0';}
-function netClr(n,inc){const p=inc>0?n/inc:0;return p>=0.20?'#16A34A':p>=0.08?'#D97706':'#EF4444';}
+function $$(n,sign=true){const abs='$'+Math.abs(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return (n<0&&sign)?'-'+abs:abs;}
+function pct(a,b){return b>0?((a/b)*100).toFixed(1):'0.0';}
+function netClr(n,inc){const p=inc>0?n/inc:0;return p>=.20?'#10B981':p>=.08?'#F59E0B':'#EF4444';}
+function uid(){return 'a'+Math.random().toString(36).slice(2,9);}
 
 function weekLabel(){
   const now=new Date();
-  const mon=new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
-  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${MO[mon.getMonth()]} ${mon.getDate()} – ${MO[sun.getMonth()]} ${sun.getDate()}, ${sun.getFullYear()}`;
+  const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${M[mon.getMonth()]} ${mon.getDate()} – ${M[sun.getMonth()]} ${sun.getDate()}, ${sun.getFullYear()}`;
 }
 function weekKey(){
-  const now=new Date();
-  const mon=new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  return `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+  const now=new Date();const mon=new Date(now);
+  mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  return`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+}
+function timeAgo(d){
+  if(!d)return'never';
+  const s=Math.floor((Date.now()-new Date(d))/1000);
+  if(s<60)return'just now';if(s<3600)return`${Math.floor(s/60)}m ago`;
+  if(s<86400)return`${Math.floor(s/3600)}h ago`;return`${Math.floor(s/86400)}d ago`;
+}
+function goalAccountRec(weeks){
+  if(weeks<=8)return{label:'Regular Savings',color:'#10B981',type:'savings',why:'Short window — keep liquid'};
+  if(weeks<=26)return{label:'High-Yield Savings',color:'#06B6D4',type:'hysa',why:'Earn interest while saving'};
+  return{label:'Investment Account',color:'#F59E0B',type:'invest',why:'Long enough horizon to grow'};
+}
+
+// ══════════════════════════════════════════════════
+// SVG CHARTS
+// ══════════════════════════════════════════════════
+function donutChart(bills,funds,surplus,total){
+  const cx=90,cy=90,r=68,sw=20;
+  const circ=2*Math.PI*r;
+  const segs=[
+    {v:Math.max(0,bills),  c:'#3B82F6'},
+    {v:Math.max(0,funds),  c:'#F59E0B'},
+    {v:Math.max(0,surplus),c:'#10B981'},
+  ].filter(s=>s.v>0&&total>0);
+  let cum=0;
+  const paths=segs.map(s=>{
+    const dash=(s.v/total)*circ;
+    const offset=circ*0.25-cum;
+    cum+=dash;
+    return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.c}" stroke-width="${sw}"
+      stroke-dasharray="${dash.toFixed(2)} ${(circ-dash).toFixed(2)}"
+      stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="butt"/>`;
+  });
+  return`<svg width="180" height="180" viewBox="0 0 180 180">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1A2840" stroke-width="${sw}"/>
+    ${paths.join('')}
+  </svg>`;
+}
+
+function barChart(weeks,w=280,h=72){
+  if(!weeks.length)return`<svg width="${w}" height="${h}"><text x="${w/2}" y="${h/2}" fill="#3A4D66" text-anchor="middle" font-size="12">Log weeks to see chart</text></svg>`;
+  const show=weeks.slice(-12);
+  const maxV=Math.max(...show.map(wk=>Math.abs(wk.net)),1);
+  const bw=Math.floor(w/show.length)-3;
+  return`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    ${show.map((wk,i)=>{
+      const bh=Math.max(3,Math.round((Math.abs(wk.net)/maxV)*(h-4)));
+      const x=i*(bw+3);const y=h-bh;
+      const c=netClr(wk.net,wk.total);
+      return`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${c}" rx="3" opacity=".85">
+        <animate attributeName="height" from="0" to="${bh}" dur=".4s" begin="${i*.04}s" fill="freeze"/>
+        <animate attributeName="y" from="${h}" to="${y}" dur=".4s" begin="${i*.04}s" fill="freeze"/>
+      </rect>`;
+    }).join('')}
+  </svg>`;
 }
 
 // ══════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════
 function render(){
-  document.getElementById('app').innerHTML = build();
+  document.getElementById('app').innerHTML=build();
   if(!eventsReady){
-    document.getElementById('app').addEventListener('click', onClick);
-    document.getElementById('app').addEventListener('input',  onInput);
-    eventsReady = true;
+    const app=document.getElementById('app');
+    app.addEventListener('click',onClick);
+    app.addEventListener('input',onInput);
+    eventsReady=true;
   }
 }
 function showToast(msg){
   if(toastTimer)clearTimeout(toastTimer);
-  S.toast=msg; render();
-  toastTimer=setTimeout(()=>{S.toast=null;render();},2800);
+  S.toast=msg;render();
+  toastTimer=setTimeout(()=>{S.toast=null;render();},2600);
 }
 
 function build(){
-  const toast=S.toast?`<div style="position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:#1C2D45;color:#EEF2FF;padding:11px 22px;border-radius:12px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.7);border:1px solid #2A3D55;pointer-events:none">${esc(S.toast)}</div>`:'';
-  return `
+  const toast=S.toast?`<div style="position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:#1E2D45;color:#F0F4FF;padding:11px 22px;border-radius:12px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.8);border:1px solid #2A3D55;pointer-events:none">${esc(S.toast)}</div>`:'';
+  return`
     ${buildHeader()}
     <div style="flex:1;overflow:hidden;display:flex;flex-direction:column" class="fade">
-      ${S.tab==='paycheck'?buildPaycheck():''}
+      ${S.tab==='dash'    ?buildDash()    :''}
       ${S.tab==='goals'   ?buildGoals()   :''}
+      ${S.tab==='accounts'?buildAccounts():''}
       ${S.tab==='history' ?buildHistory() :''}
     </div>
     ${buildNav()}
@@ -122,25 +190,35 @@ function build(){
 function buildHeader(){
   const d=load();
   const total=d.anthon+d.lexi;
-  const outgo=d.bills.reduce((s,b)=>s+b.weekly,0)+d.funds.reduce((s,f)=>s+f.weekly,0);
-  const net=total-outgo;
+  const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
+  const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
+  const net=total-bills-funds;
   const nc=netClr(net,total);
-  return `<div style="padding:14px 18px 12px;flex-shrink:0;border-bottom:1px solid #1C2D45;background:#060A12">
+  const lastW=d.weeks.length>=2?d.weeks[d.weeks.length-2]:null;
+  const diff=lastW?net-lastW.net:null;
+  const diffStr=diff!=null?`<span style="font-size:11px;color:${diff>=0?'#10B981':'#EF4444'};margin-left:8px">${diff>=0?'▲':'▼'} ${$$(Math.abs(diff))} vs last wk</span>`:'';
+
+  return`<div style="padding:14px 18px 12px;flex-shrink:0;border-bottom:1px solid #1A2840;background:linear-gradient(180deg,#0D1628 0%,#0B1221 100%)">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div>
-        <div style="font-size:19px;font-weight:800;letter-spacing:-.01em">Varen Finance</div>
-        <div style="font-size:11px;color:#7B8FAE;margin-top:1px">${weekLabel()}</div>
+        <div style="font-size:11px;color:#3B82F6;font-weight:700;letter-spacing:.1em;margin-bottom:2px">VAREN FINANCE</div>
+        <div style="font-size:12px;color:#4A5D7A">${weekLabel()}</div>
       </div>
-      <div style="text-align:right">
-        <div style="font-size:24px;font-weight:900;color:${nc};line-height:1">${$$(net)}</div>
-        <div style="font-size:10px;color:#7B8FAE">weekly surplus</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="text-align:right">
+          <div style="font-size:26px;font-weight:900;color:${nc};line-height:1;letter-spacing:-.02em">${$$(net)}</div>
+          <div style="font-size:10px;color:#4A5D7A;margin-top:1px">weekly surplus${diffStr}</div>
+        </div>
+        <button data-action="refresh" style="width:34px;height:34px;border-radius:50%;background:#1A2840;border:1px solid #2A3D55;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">
+          <span ${S.refreshing?'class="spin"':''}>↻</span>
+        </button>
       </div>
     </div>
   </div>`;
 }
 
-// ── PAYCHECK ────────────────────────────────────────
-function buildPaycheck(){
+// ── DASHBOARD ────────────────────────────────────────
+function buildDash(){
   const d=load();
   const total=d.anthon+d.lexi;
   const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
@@ -148,171 +226,210 @@ function buildPaycheck(){
   const net=total-bills-funds;
   const nc=netClr(net,total);
 
-  // bar widths
-  const bW=Math.max(0,Math.min(100,(bills/total)*100)).toFixed(1);
-  const fW=Math.max(0,Math.min(100,(funds/total)*100)).toFixed(1);
-  const nW=Math.max(0,Math.min(100,(net/total)*100)).toFixed(1);
+  return`<div class="scroll">
+    <!-- DONUT + INCOME -->
+    <div class="card" style="margin-top:14px;padding:20px 16px;margin-bottom:14px;display:flex;gap:16px;align-items:center">
+      <div style="position:relative;flex-shrink:0">
+        ${donutChart(bills,funds,net,total)}
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+          <div style="font-size:11px;color:#4A5D7A;font-weight:600">WEEKLY</div>
+          <div style="font-size:22px;font-weight:900;color:#F0F4FF;line-height:1.1">${$$(total)}</div>
+          <div style="font-size:9px;color:#4A5D7A;margin-top:1px">combined</div>
+        </div>
+      </div>
+      <div style="flex:1">
+        ${[
+          {label:'Anthon',val:d.anthon,sub:pct(d.anthon,total)+'%',c:'#94A3B8'},
+          {label:'Lexi',  val:d.lexi,  sub:pct(d.lexi,total)+'%',  c:'#94A3B8'},
+        ].map(r=>`<div style="margin-bottom:10px">
+          <div style="font-size:10px;color:#4A5D7A;font-weight:600;letter-spacing:.06em">${r.label.toUpperCase()}</div>
+          <div style="font-size:18px;font-weight:800;color:${r.c};line-height:1.1">${$$(r.val)}</div>
+          <div style="font-size:9px;color:#2A3D55;margin-top:1px">${r.sub} of combined</div>
+        </div>`).join('')}
+        <button data-action="open-income" style="font-size:11px;color:#3B82F6;background:#1A2840;border:1px solid #2A3D55;padding:5px 12px;border-radius:8px;font-weight:600">Edit Income</button>
+      </div>
+    </div>
 
-  return `<div class="scroll">
-    <!-- INCOME CARD -->
-    <div style="margin-top:14px;background:#0D1421;border-radius:14px;border:1px solid #1C2D45;overflow:hidden;margin-bottom:14px">
-      <div style="padding:11px 14px;border-bottom:1px solid #1C2D45;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#3A4D66">WEEKLY INCOME</div>
-        <button data-action="open-income" style="font-size:12px;color:#3B82F6;background:none;padding:2px 8px;border-radius:6px">Edit</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:16px 14px;gap:4px;text-align:center">
-        <div>
-          <div style="font-size:16px;font-weight:700;color:#94A3B8">${$$(d.anthon)}</div>
-          <div style="font-size:9px;color:#3A4D66;margin-top:2px">Anthon</div>
-          <div style="font-size:9px;color:#7B8FAE;margin-top:1px">${pct(d.anthon,total)}%</div>
+    <!-- LEGEND -->
+    <div style="display:flex;gap:10px;margin-bottom:14px;padding:0 2px">
+      ${[['#3B82F6','Bills',bills,total],['#F59E0B','Funds',funds,total],[nc,'Surplus',net,total]].map(([c,l,v,t])=>`
+      <div style="flex:1;background:#111B2E;border:1px solid #1A2840;border-radius:10px;padding:10px 8px;text-align:center">
+        <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:4px">
+          <div style="width:7px;height:7px;border-radius:50%;background:${c}"></div>
+          <div style="font-size:9px;color:#4A5D7A;font-weight:600">${l.toUpperCase()}</div>
         </div>
-        <div style="border-left:1px solid #1C2D45;border-right:1px solid #1C2D45">
-          <div style="font-size:20px;font-weight:900;color:#EEF2FF">${$$(total)}</div>
-          <div style="font-size:9px;color:#3A4D66;margin-top:2px">Combined</div>
-        </div>
-        <div>
-          <div style="font-size:16px;font-weight:700;color:#94A3B8">${$$(d.lexi)}</div>
-          <div style="font-size:9px;color:#3A4D66;margin-top:2px">Lexi</div>
-          <div style="font-size:9px;color:#7B8FAE;margin-top:1px">${pct(d.lexi,total)}%</div>
-        </div>
-      </div>
+        <div style="font-size:14px;font-weight:800;color:${c}">${$$(v)}</div>
+        <div style="font-size:9px;color:#2A3D55;margin-top:1px">${pct(v,t)}%</div>
+      </div>`).join('')}
     </div>
 
     <!-- BILLS -->
     <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px;display:flex;justify-content:space-between">
-      <span>BILLS</span><span style="color:#7B8FAE">${$$(bills)} · ${pct(bills,total)}%</span>
+      <span>BILLS</span><span style="color:#4A5D7A">${$$(bills)}/wk</span>
     </div>
-    <div style="background:#0D1421;border-radius:14px;border:1px solid #1C2D45;overflow:hidden;margin-bottom:14px">
-      ${d.bills.map((b,i)=>lineRow(b.name,$$(b.weekly),pct(b.weekly,total),'#2563EB',i<d.bills.length-1)).join('')}
-      <div style="padding:10px 14px;background:#0A0F1C;display:flex;justify-content:space-between">
-        <span style="font-size:12px;font-weight:700;color:#7B8FAE">Total Bills</span>
-        <span style="font-size:14px;font-weight:800;color:#EEF2FF">${$$(bills)} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pct(bills,total)}%</span></span>
-      </div>
+    <div class="card" style="overflow:hidden;margin-bottom:14px">
+      ${d.bills.map((b,i)=>allocRow(b.icon+' '+b.name,$$(b.weekly),pct(b.weekly,total),'#3B82F6',i<d.bills.length-1)).join('')}
     </div>
 
     <!-- FUNDS -->
     <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px;display:flex;justify-content:space-between">
-      <span>MISSION FUNDS</span><span style="color:#7B8FAE">${$$(funds)} · ${pct(funds,total)}%</span>
+      <span>MISSION FUNDS</span><span style="color:#4A5D7A">${$$(funds)}/wk</span>
     </div>
-    <div style="background:#0D1421;border-radius:14px;border:1px solid #1C2D45;overflow:hidden;margin-bottom:14px">
-      ${d.funds.map((f,i)=>lineRow(f.icon+' '+f.name,$$(f.weekly),pct(f.weekly,total),f.color,i<d.funds.length-1)).join('')}
-      <div style="padding:10px 14px;background:#0A0F1C;display:flex;justify-content:space-between">
-        <span style="font-size:12px;font-weight:700;color:#7B8FAE">Total Funds</span>
-        <span style="font-size:14px;font-weight:800;color:#EEF2FF">${$$(funds)} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pct(funds,total)}%</span></span>
-      </div>
+    <div class="card" style="overflow:hidden;margin-bottom:14px">
+      ${d.funds.map((f,i)=>allocRow(f.icon+' '+f.name,$$(f.weekly),pct(f.weekly,total),f.color,i<d.funds.length-1)).join('')}
     </div>
 
-    <!-- NET -->
-    <div style="padding:20px;background:#0D1421;border-radius:14px;border:1px solid ${nc}44;margin-bottom:12px;text-align:center">
-      <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px">WEEKLY SURPLUS</div>
-      <div style="font-size:46px;font-weight:900;color:${nc};line-height:1">${$$(net)}</div>
-      <div style="font-size:12px;color:#7B8FAE;margin-top:6px">${pct(net,total)}% of income · after all bills & funds</div>
-      ${net<0?`<div style="margin-top:10px;padding:8px 12px;background:#7F1D1D33;border-radius:8px;font-size:12px;color:#FCA5A5">⚠️ Outgoing exceeds income by ${$$(-net)}</div>`:''}
+    <!-- NET CARD -->
+    <div class="card ${net>=0?'glow-green':''}" style="padding:20px;margin-bottom:14px;text-align:center;border-color:${nc}44">
+      <div style="font-size:10px;color:#4A5D7A;font-weight:700;letter-spacing:.1em;margin-bottom:8px">AFTER BILLS & FUNDS</div>
+      <div style="font-size:52px;font-weight:900;color:${nc};line-height:1;letter-spacing:-.02em">${$$(net)}</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-top:6px">${pct(net,total)}% of income</div>
+      ${net<0?`<div style="margin-top:12px;padding:8px 14px;background:#7F1D1D22;border:1px solid #EF444433;border-radius:10px;font-size:12px;color:#FCA5A5">⚠️ Outgoing exceeds income by ${$$(-net)}</div>`:''}
     </div>
 
-    <!-- STACK BAR -->
-    <div style="margin-bottom:16px">
-      <div style="height:10px;border-radius:6px;overflow:hidden;display:flex">
-        <div style="width:${bW}%;background:#2563EB;transition:width .3s" title="Bills"></div>
-        <div style="width:${fW}%;background:#D97706;margin-left:2px;transition:width .3s" title="Funds"></div>
-        <div style="width:${nW}%;background:${nc};margin-left:2px;border-radius:0 4px 4px 0;transition:width .3s" title="Surplus"></div>
-      </div>
-      <div style="display:flex;gap:14px;margin-top:7px">
-        ${[['#2563EB','Bills'],['#D97706','Funds'],[nc,'Surplus']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div><span style="font-size:10px;color:#7B8FAE">${l}</span></div>`).join('')}
-      </div>
-    </div>
-
-    <button data-action="log-week" style="width:100%;padding:14px;background:#16A34A;color:#fff;border-radius:14px;font-size:14px;font-weight:800;box-shadow:0 4px 16px #16A34A33;margin-bottom:6px">
-      ✓ Log This Week
+    <button data-action="log-week" style="width:100%;padding:15px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;border-radius:14px;font-size:14px;font-weight:800;letter-spacing:.02em;box-shadow:0 4px 20px #10B98144;margin-bottom:6px">
+      ✓ &nbsp;Log This Week
     </button>
   </div>`;
 }
 
-function lineRow(name, amount, pctStr, barClr, divider){
-  return `<div style="padding:10px 14px;${divider?'border-bottom:1px solid #131E30':''}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+function allocRow(name,amt,pctStr,barClr,divider){
+  return`<div style="padding:11px 14px;${divider?'border-bottom:1px solid #131D2E':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
       <span style="font-size:13px;color:#94A3B8">${esc(name)}</span>
-      <span style="font-size:13px;font-weight:700;color:#EEF2FF">${amount} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pctStr}%</span></span>
+      <span style="font-size:13px;font-weight:700;color:#F0F4FF">${amt} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pctStr}%</span></span>
     </div>
-    <div style="height:3px;background:#131E30;border-radius:2px">
-      <div style="width:${pctStr}%;height:100%;background:${barClr}66;border-radius:2px"></div>
+    <div style="height:3px;background:#131D2E;border-radius:2px">
+      <div style="width:${pctStr}%;height:100%;background:${barClr};border-radius:2px;opacity:.7;transition:width .5s ease"></div>
     </div>
   </div>`;
 }
 
-// ── GOALS ────────────────────────────────────────────
+// ── GOALS ─────────────────────────────────────────────
 function buildGoals(){
   const d=load();
   const total=d.anthon+d.lexi;
   const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
   const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
   const surplus=total-bills-funds;
-  const goalWeekly=d.goals.reduce((s,g)=>s+g.weekly,0);
-  const free=surplus-goalWeekly;
-  const fc=free>=0?'#16A34A':'#EF4444';
+  const goalWkly=d.goals.reduce((s,g)=>s+g.weekly,0);
+  const free=surplus-goalWkly;
 
-  return `<div class="scroll">
-    <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-      ${statCard('Surplus',$$(surplus),'available weekly','#16A34A')}
-      ${statCard('Goals',$$(goalWeekly),'allocated weekly',goalWeekly>surplus?'#EF4444':'#D97706')}
-      ${statCard('Free',$$(free),'after goals',fc)}
+  return`<div class="scroll">
+    <div style="margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      ${[[$$(surplus),'Surplus','avail/wk','#10B981'],[$$(goalWkly),'Allocated','goals/wk',goalWkly>surplus?'#EF4444':'#F59E0B'],[$$(free),'Free','after goals',free>=0?'#10B981':'#EF4444']].map(([v,l,s,c])=>`
+      <div class="card" style="padding:12px 8px;text-align:center">
+        <div style="font-size:9px;color:#3A4D66;letter-spacing:.06em;margin-bottom:4px">${l.toUpperCase()}</div>
+        <div style="font-size:14px;font-weight:800;color:${c}">${v}</div>
+        <div style="font-size:9px;color:#4A5D7A;margin-top:2px">${s}</div>
+      </div>`).join('')}
     </div>
 
-    ${goalWeekly>surplus?`<div style="padding:12px 14px;background:#7F1D1D22;border:1px solid #EF444433;border-radius:12px;font-size:12px;color:#FCA5A5;margin-bottom:14px;line-height:1.5">⚠️ Goals need <strong>${$$(goalWeekly-surplus)}/wk</strong> more than your surplus. Extend a timeline or reduce a target to balance.</div>`:''}
+    ${goalWkly>surplus?`<div style="padding:12px 14px;background:#7F1D1D22;border:1px solid #EF444433;border-radius:12px;font-size:12px;color:#FCA5A5;margin-bottom:14px;line-height:1.6">⚠️ Goals need <strong>${$$(goalWkly-surplus)}/wk</strong> more than your surplus. Extend a timeline or reduce a target.</div>`:''}
 
     <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:10px">SAVINGS GOALS</div>
 
-    ${d.goals.length===0?`<div style="text-align:center;padding:36px 0;color:#3A4D66;font-size:13px">No goals yet.<br>Add your first target below.</div>`:''}
+    ${d.goals.length===0?`<div class="card" style="padding:32px;text-align:center;color:#3A4D66;font-size:13px">No goals yet. Add your first one below.</div>`:''}
 
     ${d.goals.map((g,i)=>{
       const left=Math.max(0,g.total-(g.saved||0));
       const weeksLeft=g.weekly>0?Math.ceil(left/g.weekly):0;
       const progress=g.total>0?Math.min(100,((g.saved||0)/g.total)*100):0;
       const share=surplus>0?g.weekly/surplus:0;
-      const gc=share>=0.40?'#EF4444':share>=0.25?'#D97706':'#16A34A';
+      const gc=share>=.40?'#EF4444':share>=.25?'#F59E0B':'#10B981';
+      const rec=goalAccountRec(g.weeks);
+      const linked=d.accounts.find(a=>a.goalId===g.id);
       const done=(g.saved||0)>=g.total;
-      return `<div style="background:#0D1421;border-radius:14px;border:1px solid ${done?'#16A34A44':'#1C2D45'};padding:14px;margin-bottom:10px">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#EEF2FF">${esc(g.name)}</div>
-            <div style="font-size:11px;color:#7B8FAE;margin-top:2px">${$$(g.saved||0)} saved of ${$$(g.total)}</div>
+      return`<div class="card" style="padding:16px;margin-bottom:10px;${done?'border-color:#10B98144':''}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:700;color:#F0F4FF">${esc(g.name)}</div>
+            <div style="font-size:11px;color:#4A5D7A;margin-top:2px">${$$(g.saved||0)} of ${$$(g.total)} saved</div>
           </div>
-          <button data-action="del-goal" data-idx="${i}" style="color:#3A4D66;font-size:20px;line-height:1;background:none;padding:0 4px">×</button>
+          <button data-action="del-goal" data-idx="${i}" style="color:#3A4D66;font-size:20px;background:none;padding:0 4px;line-height:1">×</button>
         </div>
-        <div style="height:6px;background:#131E30;border-radius:4px;margin-bottom:10px;overflow:hidden">
-          <div style="width:${progress.toFixed(1)}%;height:100%;background:${done?'#16A34A':gc};border-radius:4px;transition:width .4s"></div>
+        <div style="height:6px;background:#131D2E;border-radius:4px;margin-bottom:12px;overflow:hidden">
+          <div style="width:${progress.toFixed(1)}%;height:100%;background:${done?'#10B981':gc};border-radius:4px;transition:width .5s ease"></div>
         </div>
-        ${done?`<div style="text-align:center;font-size:13px;color:#4ADE80;font-weight:700;margin-bottom:10px">🎉 Fully funded!</div>`:`
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+        ${done?`<div style="text-align:center;font-size:13px;color:#10B981;font-weight:700;margin-bottom:10px">🎉 Fully funded!</div>`:`
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
           ${miniStat($$(g.weekly)+'/wk','required',gc)}
-          ${miniStat(weeksLeft+' wks','to go','#7B8FAE')}
-          ${miniStat((share*100).toFixed(0)+'%','of surplus',share>=0.40?'#EF4444':share>=0.25?'#D97706':'#7B8FAE')}
+          ${miniStat(weeksLeft+' wks','to go','#94A3B8')}
+          ${miniStat((share*100).toFixed(0)+'%','of surplus',share>=.40?'#EF4444':share>=.25?'#F59E0B':'#94A3B8')}
+        </div>
+        <!-- ACCOUNT REC -->
+        <div style="background:#0D1628;border:1px solid ${linked?rec.color+'44':'#1A2840'};border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${rec.color};flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:700;color:${rec.color}">${linked?linked.name:rec.label}</div>
+            <div style="font-size:10px;color:#4A5D7A;margin-top:1px">${linked?'Linked account':'Best for this goal · '+rec.why}</div>
+          </div>
+          ${linked?`<button data-action="unlink-goal" data-idx="${i}" style="font-size:10px;color:#3A4D66;background:#1A2840;border:1px solid #2A3D55;padding:3px 8px;border-radius:6px">Unlink</button>`:
+            d.accounts.length?`<button data-action="link-goal" data-idx="${i}" style="font-size:10px;color:#3B82F6;background:#1A2840;border:1px solid #2A3D55;padding:3px 8px;border-radius:6px">Link</button>`:''}
         </div>`}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button data-action="log-payment" data-idx="${i}" style="padding:9px;background:#131E30;border:1px solid #1C2D45;border-radius:9px;font-size:12px;font-weight:600;color:#7B8FAE">+ Log Payment</button>
-          <button data-action="edit-goal" data-idx="${i}" style="padding:9px;background:#131E30;border:1px solid #1C2D45;border-radius:9px;font-size:12px;font-weight:600;color:#7B8FAE">Edit Timeline</button>
+          <button data-action="log-payment" data-idx="${i}" style="padding:9px;background:#1A2840;border:1px solid #2A3D55;border-radius:9px;font-size:12px;font-weight:600;color:#94A3B8">+ Log Payment</button>
+          <button data-action="edit-goal" data-idx="${i}" style="padding:9px;background:#1A2840;border:1px solid #2A3D55;border-radius:9px;font-size:12px;font-weight:600;color:#94A3B8">Edit</button>
         </div>
       </div>`;
     }).join('')}
 
-    <button data-action="open-add-goal" style="width:100%;padding:13px;background:#0D1421;border:1.5px dashed #1C2D45;border-radius:14px;font-size:13px;font-weight:700;color:#7B8FAE;margin-top:4px">
+    <button data-action="open-add-goal" style="width:100%;padding:13px;background:#111B2E;border:1.5px dashed #2A3D55;border-radius:14px;font-size:13px;font-weight:700;color:#4A5D7A;margin-top:4px">
       + Add Savings Goal
     </button>
   </div>`;
 }
 
-function statCard(label,value,sub,color){
-  return `<div style="background:#0D1421;border-radius:12px;padding:12px 8px;text-align:center;border:1px solid #1C2D45">
-    <div style="font-size:9px;color:#3A4D66;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">${label}</div>
-    <div style="font-size:15px;font-weight:800;color:${color};line-height:1.1">${value}</div>
-    <div style="font-size:9px;color:#7B8FAE;margin-top:3px">${sub}</div>
+function miniStat(value,label,color){
+  return`<div style="background:#0D1628;border-radius:8px;padding:8px;text-align:center">
+    <div style="font-size:12px;font-weight:700;color:${color}">${value}</div>
+    <div style="font-size:9px;color:#3A4D66;margin-top:1px">${label}</div>
   </div>`;
 }
 
-function miniStat(value,label,color){
-  return `<div style="background:#131E30;border-radius:8px;padding:8px;text-align:center">
-    <div style="font-size:13px;font-weight:700;color:${color}">${value}</div>
-    <div style="font-size:9px;color:#3A4D66;margin-top:1px">${label}</div>
+// ── ACCOUNTS ──────────────────────────────────────────
+function buildAccounts(){
+  const d=load();
+  const totalBal=d.accounts.reduce((s,a)=>s+a.balance,0);
+
+  return`<div class="scroll">
+    <!-- TOTAL BALANCE -->
+    <div class="card glow-green" style="margin-top:14px;padding:22px 18px;margin-bottom:14px;text-align:center;border-color:#10B98133">
+      <div style="font-size:10px;color:#4A5D7A;font-weight:700;letter-spacing:.1em;margin-bottom:6px">TOTAL ACROSS ALL ACCOUNTS</div>
+      <div style="font-size:46px;font-weight:900;color:#10B981;line-height:1;letter-spacing:-.02em">${$$(totalBal)}</div>
+      <div style="font-size:11px;color:#4A5D7A;margin-top:6px">${d.accounts.length} account${d.accounts.length!==1?'s':''} tracked · updated ${timeAgo(S.lastRefresh)}</div>
+    </div>
+
+    <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:10px">YOUR ACCOUNTS</div>
+
+    ${d.accounts.length===0?`<div class="card" style="padding:32px;text-align:center;color:#3A4D66;font-size:13px">No accounts yet.<br>Add your first account below.</div>`:''}
+
+    ${d.accounts.map((a,i)=>{
+      const tc=ACCT_COLORS[a.type]||'#94A3B8';
+      const linkedGoal=d.goals.find(g=>g.id===a.goalId);
+      return`<div class="card" style="padding:16px;margin-bottom:10px;border-left:3px solid ${tc}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+              <span style="font-size:15px;font-weight:700;color:#F0F4FF">${esc(a.name)}</span>
+              <span style="font-size:9px;font-weight:700;color:${tc};background:${tc}22;padding:2px 7px;border-radius:4px">${ACCT_TYPES[a.type]||a.type}</span>
+            </div>
+            <div style="font-size:11px;color:#4A5D7A">${esc(a.institution||'')}${a.institution?' · ':''}Updated ${timeAgo(a.lastUpdated)}</div>
+          </div>
+          <button data-action="del-account" data-idx="${i}" style="color:#3A4D66;font-size:20px;background:none;padding:0 4px;line-height:1">×</button>
+        </div>
+        <div style="font-size:36px;font-weight:900;color:${a.balance>=0?tc:'#EF4444'};line-height:1;letter-spacing:-.02em;margin-bottom:12px">${$$(a.balance)}</div>
+        ${linkedGoal?`<div style="font-size:11px;color:#4A5D7A;background:#0D1628;border-radius:8px;padding:7px 10px;margin-bottom:10px">🎯 Saving for: <span style="color:#F0F4FF;font-weight:600">${esc(linkedGoal.name)}</span></div>`:''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button data-action="update-balance" data-idx="${i}" style="padding:10px;background:linear-gradient(135deg,#1A2840,#111B2E);border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:700;color:#3B82F6">Update Balance</button>
+          <button data-action="add-txn" data-idx="${i}" style="padding:10px;background:#111B2E;border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:600;color:#94A3B8">+ Transaction</button>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <button data-action="open-add-account" style="width:100%;padding:13px;background:#111B2E;border:1.5px dashed #2A3D55;border-radius:14px;font-size:13px;font-weight:700;color:#4A5D7A;margin-top:4px">
+      + Add Account
+    </button>
   </div>`;
 }
 
@@ -320,43 +437,57 @@ function miniStat(value,label,color){
 function buildHistory(){
   const d=load();
   const weeks=[...d.weeks].reverse();
-  return `<div class="scroll">
-    <div style="margin-top:14px">
-    ${weeks.length===0?`<div style="text-align:center;padding:40px 0;color:#3A4D66;font-size:13px">No weeks logged yet.<br>Log this week from the Paycheck tab.</div>`:''}
+  const chartWeeks=[...d.weeks].slice(-12);
+
+  return`<div class="scroll">
+    <!-- SPARKLINE -->
+    <div class="card" style="margin-top:14px;padding:16px;margin-bottom:14px">
+      <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:12px;display:flex;justify-content:space-between">
+        <span>WEEKLY SURPLUS — LAST 12 WEEKS</span>
+        <span style="color:#4A5D7A">${weeks.length} logged</span>
+      </div>
+      ${barChart(chartWeeks)}
+      <div style="display:flex;gap:10px;margin-top:10px">
+        ${[['#10B981','≥ 20%'],['#F59E0B','8–20%'],['#EF4444','< 8%']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div><span style="font-size:9px;color:#4A5D7A">${l}</span></div>`).join('')}
+      </div>
+    </div>
+
+    ${weeks.length===0?`<div class="card" style="padding:32px;text-align:center;color:#3A4D66;font-size:13px">No weeks logged yet.<br>Log this week from the Dashboard tab.</div>`:''}
+
     ${weeks.map(w=>{
       const nc=netClr(w.net,w.total);
-      return `<div style="background:#0D1421;border-radius:14px;border:1px solid #1C2D45;padding:14px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+      return`<div class="card" style="padding:14px;margin-bottom:10px;border-left:3px solid ${nc}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div>
-            <div style="font-size:13px;font-weight:700;color:#EEF2FF">${esc(w.weekLabel)}</div>
-            <div style="font-size:11px;color:#7B8FAE;margin-top:1px">Total: ${$$(w.total)}</div>
+            <div style="font-size:13px;font-weight:700;color:#F0F4FF">${esc(w.weekLabel)}</div>
+            <div style="font-size:11px;color:#4A5D7A;margin-top:1px">Total in: ${$$(w.total)}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:20px;font-weight:900;color:${nc}">${$$(w.net)}</div>
-            <div style="font-size:10px;color:#3A4D66">surplus · ${pct(w.net,w.total)}%</div>
+            <div style="font-size:22px;font-weight:900;color:${nc};line-height:1">${$$(w.net)}</div>
+            <div style="font-size:10px;color:#3A4D66">${pct(w.net,w.total)}% surplus</div>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          ${miniStat($$(w.bills),'bills','#7B8FAE')}
-          ${miniStat($$(w.funds),'funds','#7B8FAE')}
+          ${miniStat($$(w.bills),'bills','#4A5D7A')}
+          ${miniStat($$(w.funds),'funds','#4A5D7A')}
         </div>
       </div>`;
     }).join('')}
-    </div>
   </div>`;
 }
 
 // ── NAV ─────────────────────────────────────────────
 function buildNav(){
   const tabs=[
-    {id:'paycheck',icon:'💵',label:'Paycheck'},
+    {id:'dash',    icon:'◉', label:'Dashboard'},
     {id:'goals',   icon:'🎯',label:'Goals'},
+    {id:'accounts',icon:'🏦',label:'Accounts'},
     {id:'history', icon:'📊',label:'History'},
   ];
-  return `<div style="background:#0A0F1C;border-top:1px solid #1C2D45;display:flex;padding:8px 0 12px;flex-shrink:0">
-    ${tabs.map(t=>`<button data-action="tab" data-tab="${t.id}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:transparent;padding:4px 0;opacity:${S.tab===t.id?1:.4}">
-      <span style="font-size:20px;line-height:1">${t.icon}</span>
-      <span style="font-size:9px;font-weight:${S.tab===t.id?700:500};color:${S.tab===t.id?'#3B82F6':'#7B8FAE'}">${t.label}</span>
+  return`<div style="background:#0A1020;border-top:1px solid #1A2840;display:flex;padding:8px 0 12px;flex-shrink:0">
+    ${tabs.map(t=>`<button data-action="tab" data-tab="${t.id}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:transparent;padding:4px 0;opacity:${S.tab===t.id?1:.35}">
+      <span style="font-size:${t.id==='dash'?20:18}px;line-height:1;color:${S.tab===t.id?'#3B82F6':'inherit'}">${t.icon}</span>
+      <span style="font-size:9px;font-weight:${S.tab===t.id?700:400};color:${S.tab===t.id?'#3B82F6':'#4A5D7A'}">${t.label}</span>
     </button>`).join('')}
   </div>`;
 }
@@ -364,21 +495,21 @@ function buildNav(){
 // ── MODALS ────────────────────────────────────────────
 function buildModal(){
   const v=S.view;
-  const OV=`data-action="close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:flex-end;justify-content:center"`;
-  const SH=`data-action="noop" style="background:#0D1421;width:100%;max-width:860px;border-radius:20px 20px 0 0;padding:22px 18px 32px;border:1px solid #1C2D45;border-bottom:none;max-height:90vh;overflow-y:auto"`;
+  const OV=`data-action="close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center"`;
+  const SH=`data-action="noop" style="background:#0D1628;width:100%;max-width:900px;border-radius:22px 22px 0 0;padding:24px 18px 34px;border:1px solid #1E2D45;border-bottom:none;max-height:92vh;overflow-y:auto"`;
 
   if(v.type==='income'){
     const d=load();
-    return `<div ${OV}><div ${SH}>
+    return`<div ${OV}><div ${SH}>
       <div style="font-size:18px;font-weight:800;margin-bottom:3px">Edit Weekly Income</div>
-      <div style="font-size:12px;color:#7B8FAE;margin-bottom:20px">Update whenever your paycheck changes</div>
-      <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Anthon — Weekly Net</label>
-      <input id="inc-a" type="number" value="${d.anthon}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:22px;font-weight:700;color:#EEF2FF;margin-bottom:14px">
-      <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Lexi — Weekly Net</label>
-      <input id="inc-l" type="number" value="${d.lexi}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:22px;font-weight:700;color:#EEF2FF;margin-bottom:20px">
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:22px">Update when your check changes</div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">ANTHON — WEEKLY NET</label>
+      <input id="inc-a" type="number" value="${d.anthon}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:14px;font-size:24px;font-weight:800;color:#F0F4FF;margin-bottom:16px">
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">LEXI — WEEKLY NET</label>
+      <input id="inc-l" type="number" value="${d.lexi}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:14px;font-size:24px;font-weight:800;color:#F0F4FF;margin-bottom:22px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
-        <button data-action="save-income" style="padding:13px;background:#2563EB;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Save</button>
+        <button data-action="close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-income" style="padding:14px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Save</button>
       </div>
     </div></div>`;
   }
@@ -391,49 +522,116 @@ function buildModal(){
     const surplus=total-bills-funds;
     const g=v.data||{};
     const wkly=g.total&&g.weeks?g.total/g.weeks:0;
-    const share=surplus>0&&wkly>0?(wkly/surplus):0;
-    const gc=share>=0.40?'#EF4444':share>=0.25?'#D97706':'#16A34A';
-    return `<div ${OV}><div ${SH}>
+    const share=surplus>0&&wkly>0?wkly/surplus:0;
+    const gc=share>=.40?'#EF4444':share>=.25?'#F59E0B':'#10B981';
+    const rec=g.weeks?goalAccountRec(g.weeks):{};
+    return`<div ${OV}><div ${SH}>
       <div style="font-size:18px;font-weight:800;margin-bottom:3px">${v.editIdx!=null?'Edit Goal':'New Savings Goal'}</div>
-      <div style="font-size:12px;color:#7B8FAE;margin-bottom:18px">Set a target — we'll calculate what you need each week</div>
-      <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Goal Name</label>
-      <input id="g-name" type="text" placeholder="Vacation, emergency cushion, new TV…" value="${esc(g.name||'')}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:12px 14px;font-size:15px;color:#EEF2FF;margin-bottom:14px">
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:20px">Set a target — we'll calculate your weekly amount</div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">GOAL NAME</label>
+      <input id="g-name" type="text" placeholder="San Antonio Trip, Emergency Fund…" value="${esc(g.name||'')}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:12px 14px;font-size:15px;color:#F0F4FF;margin-bottom:14px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div>
-          <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Total Cost ($)</label>
-          <input id="g-total" type="number" placeholder="2000" value="${g.total||''}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:12px 14px;font-size:16px;color:#EEF2FF">
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">TOTAL COST ($)</label>
+          <input id="g-total" type="number" placeholder="1500" value="${g.total||''}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:12px 14px;font-size:18px;font-weight:700;color:#F0F4FF">
         </div>
         <div>
-          <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Target Weeks</label>
-          <input id="g-weeks" type="number" placeholder="26" value="${g.weeks||''}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:12px 14px;font-size:16px;color:#EEF2FF">
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">TARGET WEEKS</label>
+          <input id="g-weeks" type="number" placeholder="5" value="${g.weeks||''}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:12px 14px;font-size:18px;font-weight:700;color:#F0F4FF">
         </div>
       </div>
-      <div id="g-preview" style="padding:14px;background:#131E30;border-radius:10px;text-align:center;margin-bottom:20px">
-        ${wkly>0?`<span style="font-size:22px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#7B8FAE;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`:`<span style="font-size:12px;color:#3A4D66">Enter cost + weeks to see required weekly amount</span>`}
+      <div id="g-preview" style="padding:14px;background:#111B2E;border:1px solid ${wkly>0?gc+'44':'#1E2D45'};border-radius:12px;text-align:center;margin-bottom:${rec.label?'10px':'20px'}">
+        ${wkly>0?`<span style="font-size:24px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#4A5D7A;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`:`<span style="font-size:12px;color:#3A4D66">Enter cost + weeks to see required weekly amount</span>`}
       </div>
+      ${rec.label?`<div style="padding:10px 12px;background:#0D1628;border:1px solid ${rec.color}44;border-radius:10px;display:flex;align-items:center;gap:8px;margin-bottom:20px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${rec.color};flex-shrink:0"></div>
+        <div><div style="font-size:11px;font-weight:700;color:${rec.color}">${rec.label}</div><div style="font-size:10px;color:#4A5D7A">${rec.why}</div></div>
+      </div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
-        <button data-action="save-goal" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">${v.editIdx!=null?'Update':'Add Goal'}</button>
+        <button data-action="close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-goal" style="padding:14px;background:linear-gradient(135deg,#047857,#10B981);color:#fff;border-radius:12px;font-size:14px;font-weight:700">${v.editIdx!=null?'Update':'Add Goal'}</button>
       </div>
     </div></div>`;
   }
 
   if(v.type==='log-payment'){
-    const d=load();
-    const g=d.goals[v.idx];
-    return `<div ${OV}><div ${SH}>
+    const d=load();const g=d.goals[v.idx];
+    return`<div ${OV}><div ${SH}>
       <div style="font-size:18px;font-weight:800;margin-bottom:3px">Log Payment</div>
-      <div style="font-size:12px;color:#7B8FAE;margin-bottom:4px">${esc(g?.name)}</div>
-      <div style="font-size:11px;color:#7B8FAE;margin-bottom:18px">${$$(g?.saved||0)} saved · ${$$(Math.max(0,g?.total-(g?.saved||0)))} remaining · ${$$(g?.weekly)}/wk target</div>
-      <input id="pay-amt" type="number" placeholder="Amount" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:22px;font-weight:700;color:#EEF2FF;margin-bottom:18px">
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:4px">${esc(g?.name)}</div>
+      <div style="font-size:11px;color:#4A5D7A;margin-bottom:20px">${$$(g?.saved||0)} saved · ${$$(Math.max(0,(g?.total||0)-(g?.saved||0)))} remaining</div>
+      <input id="pay-amt" type="number" placeholder="Amount" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:14px;font-size:26px;font-weight:800;color:#F0F4FF;margin-bottom:20px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
-        <button data-action="confirm-payment" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Log It ✓</button>
+        <button data-action="close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="confirm-payment" style="padding:14px;background:linear-gradient(135deg,#047857,#10B981);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Log ✓</button>
       </div>
     </div></div>`;
   }
 
-  return '';
+  if(v.type==='add-account'){
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Add Account</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:20px">Track any savings or investment account</div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">ACCOUNT NAME</label>
+      <input id="acct-name" type="text" placeholder="Chase Savings, Fidelity, etc." style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:12px 14px;font-size:15px;color:#F0F4FF;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">INSTITUTION</label>
+          <input id="acct-inst" type="text" placeholder="Chase, CashApp…" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:14px;color:#F0F4FF">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">TYPE</label>
+          <div style="position:relative">
+            <select id="acct-type" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:14px;color:#F0F4FF;appearance:none">
+              ${Object.entries(ACCT_TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
+            </select>
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#4A5D7A;pointer-events:none">▾</span>
+          </div>
+        </div>
+      </div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">CURRENT BALANCE ($)</label>
+      <input id="acct-bal" type="number" placeholder="0.00" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:14px;font-size:26px;font-weight:800;color:#F0F4FF;margin-bottom:22px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-account" style="padding:14px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Add Account</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='update-balance'){
+    const d=load();const a=d.accounts[v.idx];
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Update Balance</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:20px">${esc(a?.name)} · ${esc(a?.institution||'')}</div>
+      <div style="font-size:14px;color:#4A5D7A;margin-bottom:8px">Current: <strong style="color:#F0F4FF">${$$(a?.balance)}</strong></div>
+      <input id="bal-new" type="number" placeholder="New balance" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:14px;font-size:26px;font-weight:800;color:#F0F4FF;margin-bottom:22px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="confirm-balance" style="padding:14px;background:linear-gradient(135deg,#047857,#10B981);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Update ✓</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='link-goal'){
+    const d=load();const g=d.goals[v.goalIdx];
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Link Account</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:18px">Which account are you saving in for <strong style="color:#F0F4FF">${esc(g?.name)}</strong>?</div>
+      ${d.accounts.map((a,i)=>{
+        const tc=ACCT_COLORS[a.type]||'#94A3B8';
+        return`<button data-action="confirm-link" data-goal="${v.goalIdx}" data-acct="${i}" style="width:100%;margin-bottom:8px;padding:12px 14px;background:#111B2E;border:1px solid #1E2D45;border-radius:12px;display:flex;align-items:center;gap:12px;text-align:left">
+          <div style="width:10px;height:10px;border-radius:50%;background:${tc};flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#F0F4FF">${esc(a.name)}</div>
+            <div style="font-size:10px;color:#4A5D7A">${ACCT_TYPES[a.type]} · ${$$(a.balance)}</div>
+          </div>
+        </button>`;
+      }).join('')}
+      <button data-action="close-modal" style="width:100%;margin-top:8px;padding:13px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+    </div></div>`;
+  }
+
+  return'';
 }
 
 // ══════════════════════════════════════════════════
@@ -444,7 +642,7 @@ function onInput(e){
     const t=parseFloat(document.getElementById('g-total')?.value)||0;
     const w=parseFloat(document.getElementById('g-weeks')?.value)||0;
     const prev=document.getElementById('g-preview');
-    if(!prev) return;
+    if(!prev)return;
     if(t>0&&w>0){
       const d=load();
       const total=d.anthon+d.lexi;
@@ -453,89 +651,138 @@ function onInput(e){
       const surplus=total-bills-funds;
       const wkly=t/w;
       const share=surplus>0?wkly/surplus:0;
-      const gc=share>=0.40?'#EF4444':share>=0.25?'#D97706':'#16A34A';
-      S.view.data = {...(S.view.data||{}), total:t, weeks:w};
-      prev.innerHTML=`<span style="font-size:22px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#7B8FAE;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`;
+      const gc=share>=.40?'#EF4444':share>=.25?'#F59E0B':'#10B981';
+      S.view.data={...(S.view.data||{}),total:t,weeks:w};
+      prev.style.borderColor=gc+'44';
+      prev.innerHTML=`<span style="font-size:24px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#4A5D7A;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`;
     } else {
-      prev.innerHTML=`<span style="font-size:12px;color:#3A4D66">Enter cost + weeks to see required weekly amount</span>`;
+      if(prev){prev.style.borderColor='#1E2D45';prev.innerHTML=`<span style="font-size:12px;color:#3A4D66">Enter cost + weeks to see required weekly amount</span>`;}
     }
   }
 }
 
 function onClick(e){
   const btn=e.target.closest('[data-action]');
-  if(!btn) return;
+  if(!btn)return;
   const a=btn.dataset.action;
+  if(a==='noop')return;
 
-  if(a==='noop') return;
+  if(a==='tab'){S.tab=btn.dataset.tab;S.view=null;render();return;}
+  if(a==='close-modal'){S.view=null;render();return;}
+  if(a==='open-income'){S.view={type:'income'};render();return;}
+  if(a==='open-add-goal'){S.view={type:'add-goal',data:{}};render();return;}
+  if(a==='open-add-account'){S.view={type:'add-account'};render();return;}
+  if(a==='log-payment'){S.view={type:'log-payment',idx:parseInt(btn.dataset.idx)};render();return;}
+  if(a==='update-balance'){S.view={type:'update-balance',idx:parseInt(btn.dataset.idx)};render();return;}
+  if(a==='link-goal'){S.view={type:'link-goal',goalIdx:parseInt(btn.dataset.idx)};render();return;}
 
-  if(a==='tab'){ S.tab=btn.dataset.tab; S.view=null; render(); return; }
-  if(a==='close-modal'){ S.view=null; render(); return; }
-  if(a==='open-income'){ S.view={type:'income'}; render(); return; }
-  if(a==='open-add-goal'){ S.view={type:'add-goal',data:{}}; render(); return; }
-  if(a==='log-payment'){ S.view={type:'log-payment',idx:parseInt(btn.dataset.idx)}; render(); return; }
+  if(a==='refresh'){
+    S.refreshing=true;render();
+    setTimeout(()=>{S.refreshing=false;S.lastRefresh=new Date().toISOString();render();showToast('Updated ✓');},900);
+    return;
+  }
 
   if(a==='edit-goal'){
-    const idx=parseInt(btn.dataset.idx);
-    const d=load();
-    const g=d.goals[idx];
-    S.view={type:'add-goal',editIdx:idx,data:{name:g.name,total:g.total,weeks:g.weeks}};
-    render(); return;
+    const idx=parseInt(btn.dataset.idx);const d=load();const g=d.goals[idx];
+    S.view={type:'add-goal',editIdx:idx,data:{name:g.name,total:g.total,weeks:g.weeks}};render();return;
   }
 
   if(a==='save-income'){
-    const a2=parseFloat(document.getElementById('inc-a')?.value)||0;
-    const l=parseFloat(document.getElementById('inc-l')?.value)||0;
-    const d=load(); d.anthon=a2; d.lexi=l; save(d); S.view=null;
-    showToast('Income updated ✓'); return;
+    const av=parseFloat(document.getElementById('inc-a')?.value)||0;
+    const lv=parseFloat(document.getElementById('inc-l')?.value)||0;
+    const d=load();d.anthon=av;d.lexi=lv;save(d);S.view=null;showToast('Income updated ✓');return;
   }
 
   if(a==='log-week'){
-    const d=load();
-    const key=weekKey();
-    if(d.weeks.find(w=>w.key===key)){ showToast('Already logged this week'); return; }
+    const d=load();const key=weekKey();
+    if(d.weeks.find(w=>w.key===key)){showToast('Already logged this week');return;}
     const total=d.anthon+d.lexi;
     const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
     const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
-    d.weeks.push({key,weekLabel:weekLabel(),anthon:d.anthon,lexi:d.lexi,total,bills,funds,net:total-bills-funds});
-    save(d); showToast('Week logged ✓ — check History'); return;
+    d.weeks.push({key,weekLabel:weekLabel(),anthon:d.anthon,lexi:d.lexi,total,bills,funds,net:total-bills-funds,date:new Date().toISOString()});
+    save(d);showToast('Week logged ✓');return;
   }
 
   if(a==='save-goal'){
     const name=(document.getElementById('g-name')?.value||'').trim();
     const total=parseFloat(document.getElementById('g-total')?.value)||0;
     const weeks=parseFloat(document.getElementById('g-weeks')?.value)||0;
-    if(!name){ showToast('Enter a goal name'); return; }
-    if(total<=0){ showToast('Enter the total cost'); return; }
-    if(weeks<=0){ showToast('Enter target weeks'); return; }
+    if(!name){showToast('Enter a goal name');return;}
+    if(total<=0){showToast('Enter the total cost');return;}
+    if(weeks<=0){showToast('Enter target weeks');return;}
     const d=load();
     const weekly=parseFloat((total/weeks).toFixed(2));
     if(S.view.editIdx!=null){
       const g=d.goals[S.view.editIdx];
-      g.name=name; g.total=total; g.weeks=weeks; g.weekly=weekly;
+      g.name=name;g.total=total;g.weeks=weeks;g.weekly=weekly;
     } else {
-      d.goals.push({name,total,weeks,weekly,saved:0,created:new Date().toISOString()});
+      d.goals.push({id:uid(),name,total,weeks,weekly,saved:0,created:new Date().toISOString()});
     }
-    save(d); S.view=null;
-    showToast(`${S.view?.editIdx!=null?'Updated':'Goal added'} — ${$$(weekly)}/wk`); return;
+    save(d);S.view=null;showToast(`${S.view?.editIdx!=null?'Updated':'Added'} — ${$$(weekly)}/wk`);return;
   }
 
   if(a==='del-goal'){
-    const idx=parseInt(btn.dataset.idx);
-    const d=load();
-    const name=d.goals[idx]?.name;
-    d.goals.splice(idx,1); save(d);
-    showToast(`"${name}" removed`); return;
+    const idx=parseInt(btn.dataset.idx);const d=load();
+    const name=d.goals[idx]?.name;d.goals.splice(idx,1);save(d);showToast(`"${name}" removed`);return;
   }
 
   if(a==='confirm-payment'){
     const amt=parseFloat(document.getElementById('pay-amt')?.value)||0;
-    if(amt<=0){ showToast('Enter an amount'); return; }
+    if(amt<=0){showToast('Enter an amount');return;}
+    const d=load();const g=d.goals[S.view.idx];
+    if(!g){S.view=null;render();return;}
+    g.saved=(g.saved||0)+amt;
+    // also update linked account balance
+    const linked=d.accounts.find(ac=>ac.goalId===g.id);
+    if(linked)linked.balance=(linked.balance||0)+amt;
+    save(d);S.view=null;
+    showToast(g.saved>=g.total?`🎉 "${g.name}" fully funded!`:`+${$$(amt)} logged`);return;
+  }
+
+  if(a==='save-account'){
+    const name=(document.getElementById('acct-name')?.value||'').trim();
+    const inst=(document.getElementById('acct-inst')?.value||'').trim();
+    const type=document.getElementById('acct-type')?.value||'savings';
+    const bal=parseFloat(document.getElementById('acct-bal')?.value)||0;
+    if(!name){showToast('Enter an account name');return;}
     const d=load();
-    const g=d.goals[S.view.idx];
-    if(!g){ S.view=null; render(); return; }
-    g.saved=(g.saved||0)+amt; save(d); S.view=null;
-    showToast(g.saved>=g.total?`🎉 "${g.name}" fully funded!`:`+${$$(amt)} logged on "${g.name}"`); return;
+    d.accounts.push({id:uid(),name,institution:inst,type,balance:bal,lastUpdated:new Date().toISOString()});
+    save(d);S.view=null;showToast(`${name} added ✓`);return;
+  }
+
+  if(a==='del-account'){
+    const idx=parseInt(btn.dataset.idx);const d=load();
+    const name=d.accounts[idx]?.name;d.accounts.splice(idx,1);save(d);showToast(`"${name}" removed`);return;
+  }
+
+  if(a==='confirm-balance'){
+    const bal=parseFloat(document.getElementById('bal-new')?.value);
+    if(isNaN(bal)){showToast('Enter a balance');return;}
+    const d=load();d.accounts[S.view.idx].balance=bal;
+    d.accounts[S.view.idx].lastUpdated=new Date().toISOString();
+    save(d);S.view=null;showToast('Balance updated ✓');return;
+  }
+
+  if(a==='confirm-link'){
+    const goalIdx=parseInt(btn.dataset.goal);
+    const acctIdx=parseInt(btn.dataset.acct);
+    const d=load();
+    const goalId=d.goals[goalIdx]?.id;
+    // clear any previous links to this goal
+    d.accounts.forEach(ac=>{if(ac.goalId===goalId)delete ac.goalId;});
+    d.accounts[acctIdx].goalId=goalId;
+    save(d);S.view=null;showToast('Account linked ✓');return;
+  }
+
+  if(a==='unlink-goal'){
+    const idx=parseInt(btn.dataset.idx);const d=load();
+    const goalId=d.goals[idx]?.id;
+    d.accounts.forEach(ac=>{if(ac.goalId===goalId)delete ac.goalId;});
+    save(d);showToast('Account unlinked');return;
+  }
+
+  if(a==='add-txn'){
+    S.view={type:'update-balance',idx:parseInt(btn.dataset.idx)};render();return;
   }
 }
 
@@ -545,6 +792,7 @@ function onClick(e){
 function init(){
   const el=document.getElementById('app');
   if(!el){setTimeout(init,50);return;}
+  S.lastRefresh=new Date().toISOString();
   render();
 }
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
