@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Varen Finance">
+<meta name="theme-color" content="#060A12">
+<style>html{height:-webkit-fill-available}body{min-height:-webkit-fill-available}</style>
+<title>Varen Finance</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#060A12;color:#EEF2FF;font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;max-width:860px;margin:0 auto}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 100px;overscroll-behavior:none}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:#1C2D45;border-radius:4px}
+button{cursor:pointer;font-family:inherit;border:none;outline:none}
+button:active{opacity:.75;transform:scale(.97)}
+input{font-family:inherit;outline:none;-webkit-appearance:none;border:none}
+@keyframes fd{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fd .2s ease}
+@media(min-width:700px){.scroll{padding:0 32px 100px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ══════════════════════════════════════════════════
+// SEED — your actual numbers
+// ══════════════════════════════════════════════════
+const SEED_BILLS = [
+  {id:'rent',     name:'Rent',                  weekly:200},
+  {id:'groc',     name:'Groceries',             weekly:250},
+  {id:'phone',    name:'Phone',                 weekly:52.50},
+  {id:'car_ins',  name:'Car Insurance',         weekly:37.50},
+  {id:'gas',      name:'Gas',                   weekly:25},
+  {id:'gr_fam',   name:'Grooming — You & Boys', weekly:45},
+  {id:'gr_lex',   name:'Grooming — Lexi',       weekly:80},
+  {id:'gr_dau',   name:'Grooming — Daughters',  weekly:10},
+  {id:'subs',     name:'Subscriptions',         weekly:8},
+  {id:'amz_sell', name:'Amazon Seller',         weekly:9.23},
+];
+const SEED_FUNDS = [
+  {id:'emergency', name:'Emergency Fund', weekly:50,  icon:'🛡️', color:'#2563EB'},
+  {id:'investment',name:'Investment',     weekly:245, icon:'🏗️', color:'#D97706'},
+  {id:'kids',      name:'Kid Fund',       weekly:75,  icon:'🌱', color:'#16A34A'},
+  {id:'date',      name:'Date Night',     weekly:50,  icon:'💙', color:'#7C3AED'},
+  {id:'travel',    name:'Travel Fund',    weekly:50,  icon:'✈️', color:'#0D9488'},
+];
+
+// ══════════════════════════════════════════════════
+// STATE + PERSISTENCE
+// ══════════════════════════════════════════════════
+let S = {tab:'paycheck', view:null, toast:null};
+let toastTimer = null;
+let eventsReady = false;
+
+function initData(){
+  return { anthon:1030, lexi:580,
+    bills:SEED_BILLS.map(b=>({...b})),
+    funds:SEED_FUNDS.map(f=>({...f})),
+    goals:[], weeks:[] };
+}
+function load(){ try{return JSON.parse(localStorage.getItem('vf'))||initData();}catch{return initData();} }
+function save(d){ try{localStorage.setItem('vf',JSON.stringify(d));}catch{} }
+
+// ══════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function $$(n){return '$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function pct(part,total){return total>0?((part/total)*100).toFixed(1):'0.0';}
+function netClr(n,inc){const p=inc>0?n/inc:0;return p>=0.20?'#16A34A':p>=0.08?'#D97706':'#EF4444';}
+
+function weekLabel(){
+  const now=new Date();
+  const mon=new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${MO[mon.getMonth()]} ${mon.getDate()} – ${MO[sun.getMonth()]} ${sun.getDate()}, ${sun.getFullYear()}`;
+}
+function weekKey(){
+  const now=new Date();
+  const mon=new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  return `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+}
+
+// ══════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════
+function render(){
+  document.getElementById('app').innerHTML = build();
+  if(!eventsReady){
+    document.getElementById('app').addEventListener('click', onClick);
+    document.getElementById('app').addEventListener('input',  onInput);
+    eventsReady = true;
+  }
+}
+function showToast(msg){
+  if(toastTimer)clearTimeout(toastTimer);
+  S.toast=msg; render();
+  toastTimer=setTimeout(()=>{S.toast=null;render();},2800);
+}
+
+function build(){
+  const toast=S.toast?`<div style="position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:#1C2D45;color:#EEF2FF;padding:11px 22px;border-radius:12px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.7);border:1px solid #2A3D55;pointer-events:none">${esc(S.toast)}</div>`:'';
+  return `
+    ${buildHeader()}
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column" class="fade">
+      ${S.tab==='paycheck'?buildPaycheck():''}
+      ${S.tab==='goals'   ?buildGoals()   :''}
+      ${S.tab==='history' ?buildHistory() :''}
+    </div>
+    ${buildNav()}
+    ${toast}
+    ${S.view?buildModal():''}`;
+}
+
+// ── HEADER ──────────────────────────────────────────
+function buildHeader(){
+  const d=load();
+  const total=d.anthon+d.lexi;
+  const outgo=d.bills.reduce((s,b)=>s+b.weekly,0)+d.funds.reduce((s,f)=>s+f.weekly,0);
+  const net=total-outgo;
+  const nc=netClr(net,total);
+  return `<div style="padding:14px 18px 12px;flex-shrink:0;border-bottom:1px solid #1C2D45;background:#060A12">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:19px;font-weight:800;letter-spacing:-.01em">Varen Finance</div>
+        <div style="font-size:11px;color:#7B8FAE;margin-top:1px">${weekLabel()}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:24px;font-weight:900;color:${nc};line-height:1">${$$(net)}</div>
+        <div style="font-size:10px;color:#7B8FAE">weekly surplus</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── PAYCHECK ────────────────────────────────────────
+function buildPaycheck(){
+  const d=load();
+  const total=d.anthon+d.lexi;
+  const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
+  const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
+  const net=total-bills-funds;
+  const nc=netClr(net,total);
+
+  // bar widths
+  const bW=Math.max(0,Math.min(100,(bills/total)*100)).toFixed(1);
+  const fW=Math.max(0,Math.min(100,(funds/total)*100)).toFixed(1);
+  const nW=Math.max(0,Math.min(100,(net/total)*100)).toFixed(1);
+
+  return `<div class="scroll">
+    <!-- INCOME CARD -->
+    <div style="margin-top:14px;background:#0D1421;border-radius:14px;border:1px solid #1C2D45;overflow:hidden;margin-bottom:14px">
+      <div style="padding:11px 14px;border-bottom:1px solid #1C2D45;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#3A4D66">WEEKLY INCOME</div>
+        <button data-action="open-income" style="font-size:12px;color:#3B82F6;background:none;padding:2px 8px;border-radius:6px">Edit</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:16px 14px;gap:4px;text-align:center">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#94A3B8">${$$(d.anthon)}</div>
+          <div style="font-size:9px;color:#3A4D66;margin-top:2px">Anthon</div>
+          <div style="font-size:9px;color:#7B8FAE;margin-top:1px">${pct(d.anthon,total)}%</div>
+        </div>
+        <div style="border-left:1px solid #1C2D45;border-right:1px solid #1C2D45">
+          <div style="font-size:20px;font-weight:900;color:#EEF2FF">${$$(total)}</div>
+          <div style="font-size:9px;color:#3A4D66;margin-top:2px">Combined</div>
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#94A3B8">${$$(d.lexi)}</div>
+          <div style="font-size:9px;color:#3A4D66;margin-top:2px">Lexi</div>
+          <div style="font-size:9px;color:#7B8FAE;margin-top:1px">${pct(d.lexi,total)}%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BILLS -->
+    <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px;display:flex;justify-content:space-between">
+      <span>BILLS</span><span style="color:#7B8FAE">${$$(bills)} · ${pct(bills,total)}%</span>
+    </div>
+    <div style="background:#0D1421;border-radius:14px;border:1px solid #1C2D45;overflow:hidden;margin-bottom:14px">
+      ${d.bills.map((b,i)=>lineRow(b.name,$$(b.weekly),pct(b.weekly,total),'#2563EB',i<d.bills.length-1)).join('')}
+      <div style="padding:10px 14px;background:#0A0F1C;display:flex;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:#7B8FAE">Total Bills</span>
+        <span style="font-size:14px;font-weight:800;color:#EEF2FF">${$$(bills)} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pct(bills,total)}%</span></span>
+      </div>
+    </div>
+
+    <!-- FUNDS -->
+    <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px;display:flex;justify-content:space-between">
+      <span>MISSION FUNDS</span><span style="color:#7B8FAE">${$$(funds)} · ${pct(funds,total)}%</span>
+    </div>
+    <div style="background:#0D1421;border-radius:14px;border:1px solid #1C2D45;overflow:hidden;margin-bottom:14px">
+      ${d.funds.map((f,i)=>lineRow(f.icon+' '+f.name,$$(f.weekly),pct(f.weekly,total),f.color,i<d.funds.length-1)).join('')}
+      <div style="padding:10px 14px;background:#0A0F1C;display:flex;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:#7B8FAE">Total Funds</span>
+        <span style="font-size:14px;font-weight:800;color:#EEF2FF">${$$(funds)} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pct(funds,total)}%</span></span>
+      </div>
+    </div>
+
+    <!-- NET -->
+    <div style="padding:20px;background:#0D1421;border-radius:14px;border:1px solid ${nc}44;margin-bottom:12px;text-align:center">
+      <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px">WEEKLY SURPLUS</div>
+      <div style="font-size:46px;font-weight:900;color:${nc};line-height:1">${$$(net)}</div>
+      <div style="font-size:12px;color:#7B8FAE;margin-top:6px">${pct(net,total)}% of income · after all bills & funds</div>
+      ${net<0?`<div style="margin-top:10px;padding:8px 12px;background:#7F1D1D33;border-radius:8px;font-size:12px;color:#FCA5A5">⚠️ Outgoing exceeds income by ${$$(-net)}</div>`:''}
+    </div>
+
+    <!-- STACK BAR -->
+    <div style="margin-bottom:16px">
+      <div style="height:10px;border-radius:6px;overflow:hidden;display:flex">
+        <div style="width:${bW}%;background:#2563EB;transition:width .3s" title="Bills"></div>
+        <div style="width:${fW}%;background:#D97706;margin-left:2px;transition:width .3s" title="Funds"></div>
+        <div style="width:${nW}%;background:${nc};margin-left:2px;border-radius:0 4px 4px 0;transition:width .3s" title="Surplus"></div>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:7px">
+        ${[['#2563EB','Bills'],['#D97706','Funds'],[nc,'Surplus']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div><span style="font-size:10px;color:#7B8FAE">${l}</span></div>`).join('')}
+      </div>
+    </div>
+
+    <button data-action="log-week" style="width:100%;padding:14px;background:#16A34A;color:#fff;border-radius:14px;font-size:14px;font-weight:800;box-shadow:0 4px 16px #16A34A33;margin-bottom:6px">
+      ✓ Log This Week
+    </button>
+  </div>`;
+}
+
+function lineRow(name, amount, pctStr, barClr, divider){
+  return `<div style="padding:10px 14px;${divider?'border-bottom:1px solid #131E30':''}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <span style="font-size:13px;color:#94A3B8">${esc(name)}</span>
+      <span style="font-size:13px;font-weight:700;color:#EEF2FF">${amount} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pctStr}%</span></span>
+    </div>
+    <div style="height:3px;background:#131E30;border-radius:2px">
+      <div style="width:${pctStr}%;height:100%;background:${barClr}66;border-radius:2px"></div>
+    </div>
+  </div>`;
+}
+
+// ── GOALS ────────────────────────────────────────────
+function buildGoals(){
+  const d=load();
+  const total=d.anthon+d.lexi;
+  const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
+  const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
+  const surplus=total-bills-funds;
+  const goalWeekly=d.goals.reduce((s,g)=>s+g.weekly,0);
+  const free=surplus-goalWeekly;
+  const fc=free>=0?'#16A34A':'#EF4444';
+
+  return `<div class="scroll">
+    <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      ${statCard('Surplus',$$(surplus),'available weekly','#16A34A')}
+      ${statCard('Goals',$$(goalWeekly),'allocated weekly',goalWeekly>surplus?'#EF4444':'#D97706')}
+      ${statCard('Free',$$(free),'after goals',fc)}
+    </div>
+
+    ${goalWeekly>surplus?`<div style="padding:12px 14px;background:#7F1D1D22;border:1px solid #EF444433;border-radius:12px;font-size:12px;color:#FCA5A5;margin-bottom:14px;line-height:1.5">⚠️ Goals need <strong>${$$(goalWeekly-surplus)}/wk</strong> more than your surplus. Extend a timeline or reduce a target to balance.</div>`:''}
+
+    <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:10px">SAVINGS GOALS</div>
+
+    ${d.goals.length===0?`<div style="text-align:center;padding:36px 0;color:#3A4D66;font-size:13px">No goals yet.<br>Add your first target below.</div>`:''}
+
+    ${d.goals.map((g,i)=>{
+      const left=Math.max(0,g.total-(g.saved||0));
+      const weeksLeft=g.weekly>0?Math.ceil(left/g.weekly):0;
+      const progress=g.total>0?Math.min(100,((g.saved||0)/g.total)*100):0;
+      const share=surplus>0?g.weekly/surplus:0;
+      const gc=share>=0.40?'#EF4444':share>=0.25?'#D97706':'#16A34A';
+      const done=(g.saved||0)>=g.total;
+      return `<div style="background:#0D1421;border-radius:14px;border:1px solid ${done?'#16A34A44':'#1C2D45'};padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#EEF2FF">${esc(g.name)}</div>
+            <div style="font-size:11px;color:#7B8FAE;margin-top:2px">${$$(g.saved||0)} saved of ${$$(g.total)}</div>
+          </div>
+          <button data-action="del-goal" data-idx="${i}" style="color:#3A4D66;font-size:20px;line-height:1;background:none;padding:0 4px">×</button>
+        </div>
+        <div style="height:6px;background:#131E30;border-radius:4px;margin-bottom:10px;overflow:hidden">
+          <div style="width:${progress.toFixed(1)}%;height:100%;background:${done?'#16A34A':gc};border-radius:4px;transition:width .4s"></div>
+        </div>
+        ${done?`<div style="text-align:center;font-size:13px;color:#4ADE80;font-weight:700;margin-bottom:10px">🎉 Fully funded!</div>`:`
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+          ${miniStat($$(g.weekly)+'/wk','required',gc)}
+          ${miniStat(weeksLeft+' wks','to go','#7B8FAE')}
+          ${miniStat((share*100).toFixed(0)+'%','of surplus',share>=0.40?'#EF4444':share>=0.25?'#D97706':'#7B8FAE')}
+        </div>`}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button data-action="log-payment" data-idx="${i}" style="padding:9px;background:#131E30;border:1px solid #1C2D45;border-radius:9px;font-size:12px;font-weight:600;color:#7B8FAE">+ Log Payment</button>
+          <button data-action="edit-goal" data-idx="${i}" style="padding:9px;background:#131E30;border:1px solid #1C2D45;border-radius:9px;font-size:12px;font-weight:600;color:#7B8FAE">Edit Timeline</button>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <button data-action="open-add-goal" style="width:100%;padding:13px;background:#0D1421;border:1.5px dashed #1C2D45;border-radius:14px;font-size:13px;font-weight:700;color:#7B8FAE;margin-top:4px">
+      + Add Savings Goal
+    </button>
+  </div>`;
+}
+
+function statCard(label,value,sub,color){
+  return `<div style="background:#0D1421;border-radius:12px;padding:12px 8px;text-align:center;border:1px solid #1C2D45">
+    <div style="font-size:9px;color:#3A4D66;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">${label}</div>
+    <div style="font-size:15px;font-weight:800;color:${color};line-height:1.1">${value}</div>
+    <div style="font-size:9px;color:#7B8FAE;margin-top:3px">${sub}</div>
+  </div>`;
+}
+
+function miniStat(value,label,color){
+  return `<div style="background:#131E30;border-radius:8px;padding:8px;text-align:center">
+    <div style="font-size:13px;font-weight:700;color:${color}">${value}</div>
+    <div style="font-size:9px;color:#3A4D66;margin-top:1px">${label}</div>
+  </div>`;
+}
+
+// ── HISTORY ─────────────────────────────────────────
+function buildHistory(){
+  const d=load();
+  const weeks=[...d.weeks].reverse();
+  return `<div class="scroll">
+    <div style="margin-top:14px">
+    ${weeks.length===0?`<div style="text-align:center;padding:40px 0;color:#3A4D66;font-size:13px">No weeks logged yet.<br>Log this week from the Paycheck tab.</div>`:''}
+    ${weeks.map(w=>{
+      const nc=netClr(w.net,w.total);
+      return `<div style="background:#0D1421;border-radius:14px;border:1px solid #1C2D45;padding:14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#EEF2FF">${esc(w.weekLabel)}</div>
+            <div style="font-size:11px;color:#7B8FAE;margin-top:1px">Total: ${$$(w.total)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:20px;font-weight:900;color:${nc}">${$$(w.net)}</div>
+            <div style="font-size:10px;color:#3A4D66">surplus · ${pct(w.net,w.total)}%</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${miniStat($$(w.bills),'bills','#7B8FAE')}
+          ${miniStat($$(w.funds),'funds','#7B8FAE')}
+        </div>
+      </div>`;
+    }).join('')}
+    </div>
+  </div>`;
+}
+
+// ── NAV ─────────────────────────────────────────────
+function buildNav(){
+  const tabs=[
+    {id:'paycheck',icon:'💵',label:'Paycheck'},
+    {id:'goals',   icon:'🎯',label:'Goals'},
+    {id:'history', icon:'📊',label:'History'},
+  ];
+  return `<div style="background:#0A0F1C;border-top:1px solid #1C2D45;display:flex;padding:8px 0 12px;flex-shrink:0">
+    ${tabs.map(t=>`<button data-action="tab" data-tab="${t.id}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:transparent;padding:4px 0;opacity:${S.tab===t.id?1:.4}">
+      <span style="font-size:20px;line-height:1">${t.icon}</span>
+      <span style="font-size:9px;font-weight:${S.tab===t.id?700:500};color:${S.tab===t.id?'#3B82F6':'#7B8FAE'}">${t.label}</span>
+    </button>`).join('')}
+  </div>`;
+}
+
+// ── MODALS ────────────────────────────────────────────
+function buildModal(){
+  const v=S.view;
+  const OV=`data-action="close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:flex-end;justify-content:center"`;
+  const SH=`data-action="noop" style="background:#0D1421;width:100%;max-width:860px;border-radius:20px 20px 0 0;padding:22px 18px 32px;border:1px solid #1C2D45;border-bottom:none;max-height:90vh;overflow-y:auto"`;
+
+  if(v.type==='income'){
+    const d=load();
+    return `<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Edit Weekly Income</div>
+      <div style="font-size:12px;color:#7B8FAE;margin-bottom:20px">Update whenever your paycheck changes</div>
+      <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Anthon — Weekly Net</label>
+      <input id="inc-a" type="number" value="${d.anthon}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:22px;font-weight:700;color:#EEF2FF;margin-bottom:14px">
+      <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Lexi — Weekly Net</label>
+      <input id="inc-l" type="number" value="${d.lexi}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:22px;font-weight:700;color:#EEF2FF;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-income" style="padding:13px;background:#2563EB;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Save</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='add-goal'){
+    const d=load();
+    const total=d.anthon+d.lexi;
+    const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
+    const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
+    const surplus=total-bills-funds;
+    const g=v.data||{};
+    const wkly=g.total&&g.weeks?g.total/g.weeks:0;
+    const share=surplus>0&&wkly>0?(wkly/surplus):0;
+    const gc=share>=0.40?'#EF4444':share>=0.25?'#D97706':'#16A34A';
+    return `<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">${v.editIdx!=null?'Edit Goal':'New Savings Goal'}</div>
+      <div style="font-size:12px;color:#7B8FAE;margin-bottom:18px">Set a target — we'll calculate what you need each week</div>
+      <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Goal Name</label>
+      <input id="g-name" type="text" placeholder="Vacation, emergency cushion, new TV…" value="${esc(g.name||'')}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:12px 14px;font-size:15px;color:#EEF2FF;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Total Cost ($)</label>
+          <input id="g-total" type="number" placeholder="2000" value="${g.total||''}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:12px 14px;font-size:16px;color:#EEF2FF">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7B8FAE;display:block;margin-bottom:6px">Target Weeks</label>
+          <input id="g-weeks" type="number" placeholder="26" value="${g.weeks||''}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:12px 14px;font-size:16px;color:#EEF2FF">
+        </div>
+      </div>
+      <div id="g-preview" style="padding:14px;background:#131E30;border-radius:10px;text-align:center;margin-bottom:20px">
+        ${wkly>0?`<span style="font-size:22px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#7B8FAE;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`:`<span style="font-size:12px;color:#3A4D66">Enter cost + weeks to see required weekly amount</span>`}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-goal" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">${v.editIdx!=null?'Update':'Add Goal'}</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='log-payment'){
+    const d=load();
+    const g=d.goals[v.idx];
+    return `<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Log Payment</div>
+      <div style="font-size:12px;color:#7B8FAE;margin-bottom:4px">${esc(g?.name)}</div>
+      <div style="font-size:11px;color:#7B8FAE;margin-bottom:18px">${$$(g?.saved||0)} saved · ${$$(Math.max(0,g?.total-(g?.saved||0)))} remaining · ${$$(g?.weekly)}/wk target</div>
+      <input id="pay-amt" type="number" placeholder="Amount" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:22px;font-weight:700;color:#EEF2FF;margin-bottom:18px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="confirm-payment" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Log It ✓</button>
+      </div>
+    </div></div>`;
+  }
+
+  return '';
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+function onInput(e){
+  if(S.view?.type==='add-goal'){
+    const t=parseFloat(document.getElementById('g-total')?.value)||0;
+    const w=parseFloat(document.getElementById('g-weeks')?.value)||0;
+    const prev=document.getElementById('g-preview');
+    if(!prev) return;
+    if(t>0&&w>0){
+      const d=load();
+      const total=d.anthon+d.lexi;
+      const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
+      const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
+      const surplus=total-bills-funds;
+      const wkly=t/w;
+      const share=surplus>0?wkly/surplus:0;
+      const gc=share>=0.40?'#EF4444':share>=0.25?'#D97706':'#16A34A';
+      S.view.data = {...(S.view.data||{}), total:t, weeks:w};
+      prev.innerHTML=`<span style="font-size:22px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#7B8FAE;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`;
+    } else {
+      prev.innerHTML=`<span style="font-size:12px;color:#3A4D66">Enter cost + weeks to see required weekly amount</span>`;
+    }
+  }
+}
+
+function onClick(e){
+  const btn=e.target.closest('[data-action]');
+  if(!btn) return;
+  const a=btn.dataset.action;
+
+  if(a==='noop') return;
+
+  if(a==='tab'){ S.tab=btn.dataset.tab; S.view=null; render(); return; }
+  if(a==='close-modal'){ S.view=null; render(); return; }
+  if(a==='open-income'){ S.view={type:'income'}; render(); return; }
+  if(a==='open-add-goal'){ S.view={type:'add-goal',data:{}}; render(); return; }
+  if(a==='log-payment'){ S.view={type:'log-payment',idx:parseInt(btn.dataset.idx)}; render(); return; }
+
+  if(a==='edit-goal'){
+    const idx=parseInt(btn.dataset.idx);
+    const d=load();
+    const g=d.goals[idx];
+    S.view={type:'add-goal',editIdx:idx,data:{name:g.name,total:g.total,weeks:g.weeks}};
+    render(); return;
+  }
+
+  if(a==='save-income'){
+    const a2=parseFloat(document.getElementById('inc-a')?.value)||0;
+    const l=parseFloat(document.getElementById('inc-l')?.value)||0;
+    const d=load(); d.anthon=a2; d.lexi=l; save(d); S.view=null;
+    showToast('Income updated ✓'); return;
+  }
+
+  if(a==='log-week'){
+    const d=load();
+    const key=weekKey();
+    if(d.weeks.find(w=>w.key===key)){ showToast('Already logged this week'); return; }
+    const total=d.anthon+d.lexi;
+    const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
+    const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
+    d.weeks.push({key,weekLabel:weekLabel(),anthon:d.anthon,lexi:d.lexi,total,bills,funds,net:total-bills-funds});
+    save(d); showToast('Week logged ✓ — check History'); return;
+  }
+
+  if(a==='save-goal'){
+    const name=(document.getElementById('g-name')?.value||'').trim();
+    const total=parseFloat(document.getElementById('g-total')?.value)||0;
+    const weeks=parseFloat(document.getElementById('g-weeks')?.value)||0;
+    if(!name){ showToast('Enter a goal name'); return; }
+    if(total<=0){ showToast('Enter the total cost'); return; }
+    if(weeks<=0){ showToast('Enter target weeks'); return; }
+    const d=load();
+    const weekly=parseFloat((total/weeks).toFixed(2));
+    if(S.view.editIdx!=null){
+      const g=d.goals[S.view.editIdx];
+      g.name=name; g.total=total; g.weeks=weeks; g.weekly=weekly;
+    } else {
+      d.goals.push({name,total,weeks,weekly,saved:0,created:new Date().toISOString()});
+    }
+    save(d); S.view=null;
+    showToast(`${S.view?.editIdx!=null?'Updated':'Goal added'} — ${$$(weekly)}/wk`); return;
+  }
+
+  if(a==='del-goal'){
+    const idx=parseInt(btn.dataset.idx);
+    const d=load();
+    const name=d.goals[idx]?.name;
+    d.goals.splice(idx,1); save(d);
+    showToast(`"${name}" removed`); return;
+  }
+
+  if(a==='confirm-payment'){
+    const amt=parseFloat(document.getElementById('pay-amt')?.value)||0;
+    if(amt<=0){ showToast('Enter an amount'); return; }
+    const d=load();
+    const g=d.goals[S.view.idx];
+    if(!g){ S.view=null; render(); return; }
+    g.saved=(g.saved||0)+amt; save(d); S.view=null;
+    showToast(g.saved>=g.total?`🎉 "${g.name}" fully funded!`:`+${$$(amt)} logged on "${g.name}"`); return;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════
+function init(){
+  const el=document.getElementById('app');
+  if(!el){setTimeout(init,50);return;}
+  render();
+}
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+</script>
+</body>
+</html>
