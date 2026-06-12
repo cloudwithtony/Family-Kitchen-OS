@@ -323,7 +323,7 @@ function buildModal(){
   const v=S.view;
   const fin=loadFinancial();
   const OV=`data-action="close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;display:flex;align-items:flex-end;justify-content:center"`;
-  const SH=`onclick="event.stopPropagation()" style="background:#0D1421;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid #1C2D45;border-bottom:none"`;
+  const SH=`data-action="noop" style="background:#0D1421;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:22px 18px 30px;border:1px solid #1C2D45;border-bottom:none"`;
 
   if(v.type==='allocate'){
     const income=fin.income||0;
@@ -378,7 +378,8 @@ function handleClick(e){
   if(!btn) return;
   const a=btn.dataset.action;
 
-  if(a==='tab'){S.tab=btn.dataset.tab;S.view=null;render();}
+  if(a==='noop'){return;}
+  else if(a==='tab'){S.tab=btn.dataset.tab;S.view=null;render();}
   else if(a==='close-modal'){S.view=null;render();}
   else if(a==='open-allocate'){S.view={type:'allocate',data:{}};render();}
   else if(a==='open-log'){S.view={type:'log',data:{}};render();}
