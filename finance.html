@@ -654,8 +654,11 @@ function buildModal(){
 // ══════════════════════════════════════════════════
 function onInput(e){
   if(S.view?.type==='add-goal'){
+    const name=(document.getElementById('g-name')?.value||'');
     const t=parseFloat(document.getElementById('g-total')?.value)||0;
     const w=parseFloat(document.getElementById('g-weeks')?.value)||0;
+    // Always persist all fields so a re-render (e.g. toast timer) doesn't clear the form
+    S.view.data={...(S.view.data||{}),name,total:t||S.view.data?.total||0,weeks:w||S.view.data?.weeks||0};
     const prev=document.getElementById('g-preview');
     if(!prev)return;
     if(t>0&&w>0){
@@ -667,7 +670,6 @@ function onInput(e){
       const wkly=t/w;
       const share=surplus>0?wkly/surplus:0;
       const gc=share>=.40?'#EF4444':share>=.25?'#F59E0B':'#10B981';
-      S.view.data={...(S.view.data||{}),total:t,weeks:w};
       prev.style.borderColor=gc+'44';
       prev.innerHTML=`<span style="font-size:24px;font-weight:900;color:${gc}">${$$(wkly)}/wk</span><span style="font-size:11px;color:#4A5D7A;margin-left:10px">${(share*100).toFixed(0)}% of surplus</span>`;
     } else {
@@ -733,7 +735,8 @@ function onClick(e){
     } else {
       d.goals.push({id:uid(),name,total,weeks,weekly,saved:0,created:new Date().toISOString()});
     }
-    save(d);S.view=null;showToast(`${S.view?.editIdx!=null?'Updated':'Added'} — ${$$(weekly)}/wk`);return;
+    const wasEditing=S.view.editIdx!=null;
+    save(d);S.view=null;showToast(`${wasEditing?'Updated':'Added'} — ${$$(weekly)}/wk`);return;
   }
 
   if(a==='del-goal'){
