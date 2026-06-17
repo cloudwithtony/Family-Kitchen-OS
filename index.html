@@ -683,8 +683,8 @@ function handleClick(e){
     });
     const logEntry={id:"l"+Date.now().toString(36),recipeId:recipe.id,recipeName:recipe.name,ings:recipe.ings,cookedAt:now()};
     const newLog=[logEntry,...S.cookLog];
-    saveCookLog();saveItems();
     setState({items:updated,cooking:null,cookLog:newLog});
+    saveCookLog();saveItems();
     showToast("🍳 Cooked "+recipe.name+"! Check Cook Log to undo.");
   }
   else if(action==="toggle-bought"){
@@ -708,8 +708,8 @@ function handleClick(e){
       if(f)updated=updated.map(p=>p.id===f.id?{...p,qty:parseFloat((p.qty+i.q).toFixed(2))}:p);
     });
     const newLog=S.cookLog.filter(l=>l.id!==e.id);
-    saveCookLog();saveItems();
     setState({items:updated,undoMeal:null,cookLog:newLog});
+    saveCookLog();saveItems();
     showToast("↩ "+e.recipeName+" undone — pantry restored!");
   }
   // ── Plan actions ─────────────────────────────────────────
@@ -733,8 +733,8 @@ function handleClick(e){
     const newId="u"+Date.now().toString(36);
     const newItem=mkItem(newId,f.name.trim(),parseFloat(f.qty)||0,f.unit.trim()||"count",f.loc,f.cat,parseInt(f.expDays)||0,parseFloat(f.price)||0,parseInt(f.low)||0,0);
     const updated=[...S.items,newItem];
-    saveItems();
     setState({items:updated,addItem:null});
+    saveItems();
     showToast("✅ "+f.name.trim()+" added to pantry!");
   }
   // ── Add Meal actions ──────────────────────────────────────
@@ -774,8 +774,8 @@ function handleClick(e){
     const newId="r"+Date.now().toString(36);
     const newRecipe={id:newId,name:f.name.trim(),gf:f.gf,cat:f.cat,servings:parseInt(f.servings)||1,ings:f.ings};
     const updated=[...S.recipes,newRecipe];
-    saveRecipes();
     setState({recipes:updated,addMeal:null,mealTab:f.cat});
+    saveRecipes();
     showToast("🍽️ "+f.name.trim()+" added to meals!");
   }
 }
