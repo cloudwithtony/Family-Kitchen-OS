@@ -87,6 +87,30 @@ const RUN_LAP_MILES=0.25;
 const RUN_TARGET_LAPS=9;
 
 // ══════════════════════════════════════════════════
+// RUNNING CLUB DATA
+// ══════════════════════════════════════════════════
+const RC_PEOPLE=[
+  {id:'dad',name:'Dad',icon:'👨',isDad:true},
+  {id:'noah',name:'Noah',icon:'🧒'},
+  {id:'zayden',name:'Zayden',icon:'🧒'},
+  {id:'iris',name:'Iris',icon:'👧',lapOnly:true},
+];
+const RC_LAP_MILES=1/3;
+const RC_EFFORTS=[
+  {id:'walk',label:'Walked',rate:0.50,icon:'🚶'},
+  {id:'jog',label:'Jogged',rate:1.00,icon:'🏃'},
+  {id:'power',label:'Power',rate:1.50,icon:'⚡'},
+];
+const RC_IRIS_RATE=0.25;
+const RC_CONSISTENCY_TIERS=[{days:7,amt:5},{days:5,amt:3},{days:3,amt:1}];
+const RC_DISTANCE_TIERS=[{miles:20,amt:10},{miles:15,amt:5},{miles:10,amt:3}];
+const RC_PR_BONUS=2;
+const RC_FAMILY_BONUS=1;
+const RC_FAMILY_TRIO=['dad','noah','zayden'];
+const RC_DAD_MIN_DAYS=3;
+const RC_DAD_MISS_BONUS=0.5;
+
+// ══════════════════════════════════════════════════
 // FINANCE DATA
 // ══════════════════════════════════════════════════
 const FIN_SEED_BILLS=[
@@ -222,6 +246,8 @@ let S={
   // fitness
   fTab:'yoga',
   fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[]},
+  // running club
+  rcTab:'week',rcView:null,
   // kitchen
   items:[],recipes:[],kTab:'home',pantrySearch:"",pantryLoc:"all",
   mealTab:"breakfast",mealsView:"recipes",cooking:null,undoMeal:null,
@@ -298,6 +324,101 @@ function finGoalAccountRec(weeks){
 // ── storage: fitness ──
 function loadFit(){try{return JSON.parse(localStorage.getItem('fk-fit'))||[];}catch{return[];}}
 function saveFit(){try{localStorage.setItem('fk-fit',JSON.stringify(S.fit.fitLog));}catch{}}
+
+// ── storage: running club ──
+function rcInitData(){return{logs:[],pr:{},paid:{}};}
+function loadRC(){
+  try{
+    const d=JSON.parse(localStorage.getItem('rc'))||rcInitData();
+    if(!d.pr)d.pr={};
+    if(!d.paid)d.paid={};
+    if(!d.logs)d.logs=[];
+    return d;
+  }catch{return rcInitData();}
+}
+function saveRC(d){try{localStorage.setItem('rc',JSON.stringify(d));}catch{}}
+function rcPerson(id){return RC_PEOPLE.find(p=>p.id===id);}
+function rcDayKey(d){const dt=new Date(d);return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;}
+function rcWeekKey(d){
+  const dt=new Date(d);const mon=new Date(dt);
+  mon.setDate(dt.getDate()-((dt.getDay()+6)%7));
+  return`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+}
+function rcWeekLabel(weekKey){
+  const mon=new Date(weekKey+'T00:00:00');const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${MN[mon.getMonth()]} ${mon.getDate()}–${MN[sun.getMonth()]} ${sun.getDate()}`;
+}
+function rcMileSecToStr(sec){if(!sec)return'—';const m=Math.floor(sec/60);const s=sec%60;return`${m}:${String(s).padStart(2,'0')}`;}
+function rcStrToSec(str){
+  if(!str)return null;
+  const parts=String(str).split(':');if(parts.length!==2)return null;
+  const m=parseInt(parts[0],10),s=parseInt(parts[1],10);
+  if(isNaN(m)||isNaN(s))return null;
+  return m*60+s;
+}
+function rcTierBonus(tiers,value){for(const t of tiers){if(value>=(t.days!==undefined?t.days:t.miles))return t.amt;}return 0;}
+
+function rcWeekStats(d,weekKey){
+  const stats={};
+  RC_PEOPLE.forEach(p=>{stats[p.id]={laps:0,miles:0,base:0,prBonus:0,days:new Set()};});
+  const weekLogs=d.logs.filter(l=>rcWeekKey(l.date)===weekKey);
+  weekLogs.forEach(l=>{
+    const s=stats[l.person];if(!s)return;
+    s.laps+=l.laps;s.miles+=l.miles;s.base+=l.earned;s.prBonus+=(l.prBonus||0);
+    s.days.add(rcDayKey(l.date));
+  });
+  const dayPeople={};
+  weekLogs.forEach(l=>{
+    const dk=rcDayKey(l.date);
+    if(!dayPeople[dk])dayPeople[dk]=new Set();
+    dayPeople[dk].add(l.person);
+  });
+  let familyDays=0;
+  Object.values(dayPeople).forEach(set=>{if(RC_FAMILY_TRIO.every(id=>set.has(id)))familyDays++;});
+  const familyBonusEach=familyDays*RC_FAMILY_BONUS;
+  RC_PEOPLE.forEach(p=>{stats[p.id].familyBonus=RC_FAMILY_TRIO.includes(p.id)?familyBonusEach:0;});
+
+  RC_PEOPLE.forEach(p=>{
+    const s=stats[p.id];
+    s.consistencyBonus=rcTierBonus(RC_CONSISTENCY_TIERS,s.days.size);
+    s.distanceBonus=rcTierBonus(RC_DISTANCE_TIERS,s.miles);
+  });
+
+  const dadMissed=stats.dad.days.size<RC_DAD_MIN_DAYS;
+  RC_PEOPLE.forEach(p=>{stats[p.id].dadMissBonus=(!p.isDad&&dadMissed)?RC_DAD_MISS_BONUS:0;});
+
+  RC_PEOPLE.forEach(p=>{
+    const s=stats[p.id];
+    s.total=parseFloat((s.base+s.prBonus+s.consistencyBonus+s.distanceBonus+s.familyBonus+s.dadMissBonus).toFixed(2));
+  });
+  return{stats,dadMissed,familyDays};
+}
+
+function rcLogRun({person,laps,effort,mileTimeStr}){
+  if(!laps||laps<=0)return null;
+  const d=loadRC();
+  const isIris=!!rcPerson(person)?.lapOnly;
+  const miles=parseFloat((laps*RC_LAP_MILES).toFixed(2));
+  const rate=isIris?0:(RC_EFFORTS.find(e=>e.id===effort)?.rate||0);
+  const earned=parseFloat((isIris?laps*RC_IRIS_RATE:miles*rate).toFixed(2));
+  let prBonus=0;
+  const mileSec=rcStrToSec(mileTimeStr);
+  if(mileSec&&miles>=1){
+    const prev=d.pr[person];
+    if(!prev||mileSec<prev.sec){
+      d.pr[person]={sec:mileSec,date:now()};
+      prBonus=RC_PR_BONUS;
+    }
+  }
+  const entry={id:'rc'+Date.now().toString(36),person,date:now(),laps,effort:isIris?null:effort,miles,earned,prBonus,mileSec:mileSec||null};
+  d.logs=[entry,...d.logs];
+  saveRC(d);
+  return entry;
+}
+function rcDeleteLog(id){const d=loadRC();d.logs=d.logs.filter(l=>l.id!==id);saveRC(d);}
+function rcMarkPaid(person,weekKey){const d=loadRC();d.paid[`${person}_${weekKey}`]=true;saveRC(d);}
+function rcUnmarkPaid(person,weekKey){const d=loadRC();delete d.paid[`${person}_${weekKey}`];saveRC(d);}
 // ══════════════════════════════════════════════════
 // MISSIONS HELPERS
 // ══════════════════════════════════════════════════
@@ -459,6 +580,17 @@ function runLog(){
   S.fit.runLaps=0;S.fit.runStart=null;
   showToast('🏃 Run logged — '+miles+' mi');
 }
+
+// ── running club ──
+function rcOpenLogModal(){S.rcView={type:'log-run',data:{person:'noah',laps:0,effort:'jog',mileTimeStr:''}};render();}
+function rcSaveLog(){
+  const v=S.rcView?.data;
+  if(!v||!v.laps||v.laps<=0){showToast('Log at least one lap first');return;}
+  const entry=rcLogRun({person:v.person,laps:v.laps,effort:v.effort,mileTimeStr:v.mileTimeStr});
+  S.rcView=null;
+  const total=parseFloat((entry.earned+entry.prBonus).toFixed(2));
+  showToast(entry.prBonus>0?`🏅 New PR! +${fmt(total)} earned`:`🏃 Run logged — ${fmt(total)} earned`);
+}
 // ══════════════════════════════════════════════════
 // MASTER RENDER
 // ══════════════════════════════════════════════════
@@ -498,6 +630,7 @@ function render(){
     ${S.toast?toast(S.toast):''}
     ${S.view?missionsModal():''}
     ${S.finView?financeModal():''}
+    ${S.rcView?rcModal():''}
     ${S.cooking?cookModal():''}
     ${S.addItem?addItemModal():''}
     ${S.addMeal?addMealModal():''}
@@ -521,7 +654,7 @@ function homeTab(){
 
   const btns=[
     {icon:'☑️',label:'Five Missions',sub:sc===5?'All 5 locked in — nice!':sc+' of 5 done today',color:'#2563EB',tab:'missions'},
-    {icon:'🏃',label:'Fitness',sub:'Yoga · Strength · Run',color:'#16A34A',tab:'fitness'},
+    {icon:'🏃',label:'Fitness',sub:'Yoga · Strength · Run · Club',color:'#16A34A',tab:'fitness'},
     {icon:'🍽️',label:'Kitchen',sub:ac>0?ac+' alert'+(ac!==1?'s':'')+' need attention':'Pantry, meals & shopping',color:ac>0?'#DC2626':'#0D9488',tab:'kitchen'},
     {icon:'📊',label:'History',sub:'Streaks, sessions & cook log',color:'#7C3AED',tab:'history'},
   ];
@@ -1267,12 +1400,13 @@ function fitnessTab(){
       ${S.fTab==='yoga'?fitnessYoga():''}
       ${S.fTab==='strength'?fitnessStrength():''}
       ${S.fTab==='run'?fitnessRun():''}
+      ${S.fTab==='club'?fitnessClub():''}
     </div>
   `;
 }
 
 function fitnessSubNav(){
-  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'}];
+  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
   return`<div style="display:flex;gap:6px;padding:10px 16px 4px;flex-shrink:0">
     ${tabs.map(t=>`<button data-action="f-tab" data-ftab="${t.id}" style="flex:1;padding:9px 4px;background:${S.fTab===t.id?'#16A34A':'var(--card)'};color:${S.fTab===t.id?'#fff':'var(--t2)'};border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${S.fTab===t.id?'#16A34A':'var(--border)'}">${t.icon} ${t.label}</button>`).join('')}
   </div>`;
@@ -1379,6 +1513,192 @@ function fitnessRun(){
     </div>`).join('')}`:''}
   </div>`;
 }
+
+// ══════════════════════════════════════════════════
+// RUNNING CLUB TAB
+// ══════════════════════════════════════════════════
+function fitnessClub(){
+  return`<div style="padding:10px 16px 4px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
+    <button data-action="rc-open-log" style="width:100%;padding:13px;background:linear-gradient(135deg,#16A34A,#22C55E);color:#fff;border-radius:14px;font-size:14px;font-weight:800;box-shadow:0 4px 16px #16A34A44">+ Log a Run</button>
+    ${fitnessClubSubNav()}
+  </div>
+  ${S.rcTab==='week'?fitnessClubWeek():''}
+  ${S.rcTab==='payout'?fitnessClubPayout():''}
+  ${S.rcTab==='records'?fitnessClubRecords():''}`;
+}
+
+function fitnessClubSubNav(){
+  const tabs=[{id:'week',label:'This Week'},{id:'payout',label:'Payout'},{id:'records',label:'Records'}];
+  return`<div style="display:flex;gap:6px">
+    ${tabs.map(t=>`<button data-action="rc-tab" data-rctab="${t.id}" style="flex:1;padding:8px 4px;background:${S.rcTab===t.id?'#2563EB':'var(--card)'};color:${S.rcTab===t.id?'#fff':'var(--t2)'};border-radius:9px;font-size:11px;font-weight:700;border:1px solid ${S.rcTab===t.id?'#2563EB':'var(--border)'}">${t.label}</button>`).join('')}
+  </div>`;
+}
+
+function rcBonusChips(s){
+  const chips=[];
+  if(s.consistencyBonus)chips.push(`🔥 Consistency +${fmt(s.consistencyBonus)}`);
+  if(s.distanceBonus)chips.push(`📏 Distance +${fmt(s.distanceBonus)}`);
+  if(s.familyBonus)chips.push(`👨‍👩‍👦 Family +${fmt(s.familyBonus)}`);
+  if(s.prBonus)chips.push(`🏅 PR +${fmt(s.prBonus)}`);
+  if(s.dadMissBonus)chips.push(`💸 Dad Miss +${fmt(s.dadMissBonus)}`);
+  if(!chips.length)return'';
+  return`<div style="display:flex;gap:6px;flex-wrap:wrap">${chips.map(c=>`<span style="font-size:10px;background:#111B2E;border:1px solid #1E2D45;border-radius:8px;padding:4px 8px;color:#94A3B8">${c}</span>`).join('')}</div>`;
+}
+
+function fitnessClubWeek(){
+  const d=loadRC();
+  const wk=rcWeekKey(now());
+  const{stats,dadMissed,familyDays}=rcWeekStats(d,wk);
+  const recent=d.logs.filter(l=>rcWeekKey(l.date)===wk).slice(0,8);
+  return`<div class="scroll fade" style="padding-top:10px">
+    <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">WEEK OF ${rcWeekLabel(wk).toUpperCase()}</div>
+    ${dadMissed?`<div style="padding:10px 12px;background:#2A1500;border:1px solid #7C2D12;border-radius:10px;font-size:11px;color:#FDBA74;margin-bottom:12px">⚠️ Dad hasn't hit ${RC_DAD_MIN_DAYS} run days yet this week — every kid gets +${fmt(RC_DAD_MISS_BONUS)} if it stays that way through Sunday</div>`:''}
+    ${familyDays>0?`<div style="padding:10px 12px;background:#0F2A1A;border:1px solid #166534;border-radius:10px;font-size:11px;color:#4ADE80;margin-bottom:12px">👨‍👩‍👦‍👦 Family Bonus earned ${familyDays} day${familyDays>1?'s':''} this week — Dad, Noah & Zayden ran together!</div>`:''}
+    ${RC_PEOPLE.map(p=>{
+      const s=stats[p.id];
+      return`<div class="fin-card" style="padding:14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:14px;font-weight:800;color:#EEF2FF">${p.icon} ${p.name}</div>
+          <div style="font-size:18px;font-weight:900;color:#4ADE80">${fmt(s.total)}</div>
+        </div>
+        <div style="font-size:11px;color:#7B8FAE;margin-bottom:8px">${s.laps} laps · ${s.miles.toFixed(2)} mi · ${s.days.size} day${s.days.size!==1?'s':''} run</div>
+        ${rcBonusChips(s)}
+      </div>`;
+    }).join('')}
+    ${recent.length>0?`<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin:16px 0 10px">RECENT LOGS</div>
+    ${recent.map(l=>{
+      const p=rcPerson(l.person);
+      const ef=RC_EFFORTS.find(e=>e.id===l.effort);
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
+        <div>
+          <div style="font-size:12px;color:#EEF2FF;font-weight:700">${p.icon} ${p.name} ${ef?ef.icon:''}</div>
+          <div style="font-size:10px;color:var(--t2)">${new Date(l.date).toLocaleDateString()} · ${l.laps} laps · ${l.miles.toFixed(2)} mi${l.mileSec?' · '+rcMileSecToStr(l.mileSec)+'/mi':''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;color:#4ADE80;font-weight:700">${fmt(l.earned+(l.prBonus||0))}${l.prBonus?' 🏅':''}</span>
+          <button data-action="rc-del-log" data-id="${l.id}" style="font-size:11px;color:#EF4444">✕</button>
+        </div>
+      </div>`;
+    }).join('')}`:''}
+  </div>`;
+}
+
+function fitnessClubPayout(){
+  const d=loadRC();
+  const weeks=[...new Set(d.logs.map(l=>rcWeekKey(l.date)))].sort().reverse();
+  const kids=RC_PEOPLE.filter(p=>!p.isDad);
+  if(weeks.length===0)return`<div class="scroll fade" style="padding-top:40px;text-align:center"><div style="font-size:13px;color:var(--t2)">No runs logged yet — log a run to start earning!</div></div>`;
+  let totalOwed=0;
+  weeks.forEach(wk=>{
+    const{stats}=rcWeekStats(d,wk);
+    kids.forEach(k=>{if(!d.paid[`${k.id}_${wk}`])totalOwed+=stats[k.id].total;});
+  });
+  const curWk=rcWeekKey(now());
+  return`<div class="scroll fade" style="padding-top:10px">
+    <div class="fin-card fin-glow-green" style="padding:18px;text-align:center;margin-bottom:18px">
+      <div style="font-size:11px;color:#7B8FAE;font-weight:700;letter-spacing:.06em;margin-bottom:6px">TOTAL YOU OWE RIGHT NOW</div>
+      <div style="font-size:34px;font-weight:900;color:#4ADE80">${fmt(totalOwed)}</div>
+      <div style="font-size:11px;color:#4A5D7A;margin-top:4px">Paid out every Sunday evening</div>
+    </div>
+    ${weeks.map(wk=>{
+      const{stats}=rcWeekStats(d,wk);
+      const isCurrent=wk===curWk;
+      const rows=kids.map(k=>{
+        const s=stats[k.id];
+        if(s.laps===0&&s.total<=0)return'';
+        const paidKey=`${k.id}_${wk}`;
+        const isPaid=!!d.paid[paidKey];
+        return`<div class="fin-card" style="padding:13px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#EEF2FF">${k.icon} ${k.name}</div>
+            <div style="font-size:11px;color:#7B8FAE">${fmt(s.total)} owed</div>
+          </div>
+          ${isPaid?`<button data-action="rc-unmark-paid" data-person="${k.id}" data-week="${wk}" style="padding:9px 14px;background:#0F2A1A;color:#4ADE80;border:1px solid #166534;border-radius:10px;font-size:12px;font-weight:700">Paid ✓</button>`
+            :`<button data-action="rc-mark-paid" data-person="${k.id}" data-week="${wk}" style="padding:9px 14px;background:#16A34A;color:#fff;border-radius:10px;font-size:12px;font-weight:700">Mark Paid</button>`}
+        </div>`;
+      }).join('');
+      if(!rows)return'';
+      return`<div style="margin-bottom:18px">
+        <div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.06em;margin-bottom:8px">${rcWeekLabel(wk).toUpperCase()}${isCurrent?' · IN PROGRESS':''}</div>
+        ${rows}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function fitnessClubRecords(){
+  const d=loadRC();
+  return`<div class="scroll fade" style="padding-top:10px">
+    <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">FASTEST MILE — PERSONAL RECORDS</div>
+    ${RC_PEOPLE.map(p=>{
+      const pr=d.pr[p.id];
+      return`<div class="fin-card" style="padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">${p.icon}</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#EEF2FF">${p.name}</div>
+            <div style="font-size:10px;color:#7B8FAE">${pr?new Date(pr.date).toLocaleDateString():'No record yet'}</div>
+          </div>
+        </div>
+        <div style="font-size:20px;font-weight:900;color:${pr?'#4ADE80':'#3A4D66'}">${pr?rcMileSecToStr(pr.sec):'—'}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function rcModal(){
+  const v=S.rcView;
+  const OV=`data-action="rc-close-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center"`;
+  const SH=`data-action="noop" style="background:#0D1628;width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:24px 18px 34px;border:1px solid #1E2D45;border-bottom:none;max-height:92vh;overflow-y:auto"`;
+
+  if(v.type==='log-run'){
+    const data=v.data;
+    const person=data.person||'noah';
+    const isIris=!!rcPerson(person)?.lapOnly;
+    const laps=data.laps||0;
+    const effort=data.effort||'jog';
+    const miles=(laps*RC_LAP_MILES).toFixed(2);
+    const earnPreview=isIris?laps*RC_IRIS_RATE:laps*RC_LAP_MILES*(RC_EFFORTS.find(e=>e.id===effort)?.rate||0);
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Log a Run</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:18px">3 laps = 1 mile</div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:8px">WHO RAN?</label>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:18px">
+        ${RC_PEOPLE.map(pp=>`<button data-action="rc-pick-person" data-person="${pp.id}" style="padding:10px 4px;background:${person===pp.id?'#16A34A':'#111B2E'};border:1px solid ${person===pp.id?'#16A34A':'#1E2D45'};border-radius:12px;text-align:center">
+          <div style="font-size:20px">${pp.icon}</div>
+          <div style="font-size:11px;font-weight:700;color:${person===pp.id?'#fff':'#94A3B8'};margin-top:2px">${pp.name}</div>
+        </button>`).join('')}
+      </div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:8px">LAPS COMPLETED</label>
+      <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:6px">
+        <button data-action="rc-lap-dec" style="width:44px;height:44px;border-radius:50%;background:#1C2D45;color:#EEF2FF;font-size:20px;font-weight:700">−</button>
+        <div style="font-size:36px;font-weight:900;color:#EEF2FF;min-width:60px;text-align:center">${laps}</div>
+        <button data-action="rc-lap-inc" style="width:44px;height:44px;border-radius:50%;background:#16A34A;color:#fff;font-size:20px;font-weight:700">+</button>
+      </div>
+      <div style="text-align:center;font-size:12px;color:#4A5D7A;margin-bottom:18px">${miles} mi</div>
+      ${!isIris?`<label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:8px">EFFORT LEVEL</label>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px">
+        ${RC_EFFORTS.map(ef=>`<button data-action="rc-pick-effort" data-effort="${ef.id}" style="padding:12px 4px;background:${effort===ef.id?'#2563EB':'#111B2E'};border:1px solid ${effort===ef.id?'#2563EB':'#1E2D45'};border-radius:12px;text-align:center">
+          <div style="font-size:18px">${ef.icon}</div>
+          <div style="font-size:11px;font-weight:700;color:${effort===ef.id?'#fff':'#94A3B8'};margin-top:2px">${ef.label}</div>
+          <div style="font-size:9px;color:${effort===ef.id?'#BFDBFE':'#4A5D7A'}">$${ef.rate.toFixed(2)}/mi</div>
+        </button>`).join('')}
+      </div>`:`<div style="padding:10px 12px;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;font-size:12px;color:#94A3B8;margin-bottom:18px">Iris earns $${RC_IRIS_RATE.toFixed(2)} per lap at any pace — no mile requirement 💛</div>`}
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">BEST MILE TIME (OPTIONAL — m:ss)</label>
+      <input id="rc-mile-time" type="text" placeholder="8:30" value="${esc(data.mileTimeStr||'')}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:12px 14px;font-size:16px;color:#F0F4FF;margin-bottom:18px">
+      <div style="padding:14px;background:#111B2E;border:1px solid #16A34A44;border-radius:12px;text-align:center;margin-bottom:20px">
+        <span style="font-size:22px;font-weight:900;color:#4ADE80">${fmt(earnPreview)}</span><span style="font-size:11px;color:#4A5D7A;margin-left:8px">earned this run</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="rc-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="rc-save-log" style="padding:14px;background:linear-gradient(135deg,#16A34A,#22C55E);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Log Run ✓</button>
+      </div>
+    </div></div>`;
+  }
+
+  return'';
+}
+
 // ══════════════════════════════════════════════════
 // KITCHEN TAB
 // ══════════════════════════════════════════════════
@@ -2058,6 +2378,23 @@ function handleClick(e){
   if(a==='run-lap'){runLap();return;}
   if(a==='run-reset'){runReset();return;}
   if(a==='run-log'){runLog();render();return;}
+  // ── running club ──
+  if(a==='rc-tab'){setState({rcTab:btn.dataset.rctab});return;}
+  if(a==='rc-open-log'){rcOpenLogModal();return;}
+  if(a==='rc-close-modal'){setState({rcView:null});return;}
+  if(a==='rc-pick-person'){
+    S.rcView.data.person=btn.dataset.person;
+    if(rcPerson(btn.dataset.person)?.lapOnly)S.rcView.data.effort=null;
+    else if(!S.rcView.data.effort)S.rcView.data.effort='jog';
+    render();return;
+  }
+  if(a==='rc-pick-effort'){S.rcView.data.effort=btn.dataset.effort;render();return;}
+  if(a==='rc-lap-inc'){S.rcView.data.laps=(S.rcView.data.laps||0)+1;render();return;}
+  if(a==='rc-lap-dec'){S.rcView.data.laps=Math.max(0,(S.rcView.data.laps||0)-1);render();return;}
+  if(a==='rc-save-log'){rcSaveLog();render();return;}
+  if(a==='rc-del-log'){rcDeleteLog(btn.dataset.id);render();return;}
+  if(a==='rc-mark-paid'){rcMarkPaid(btn.dataset.person,btn.dataset.week);render();return;}
+  if(a==='rc-unmark-paid'){rcUnmarkPaid(btn.dataset.person,btn.dataset.week);render();return;}
   // ── kitchen ──
   if(a==='k-tab'){setState({kTab:btn.dataset.ktab});return;}
   if(a==='meal-tab'){setState({mealTab:btn.dataset.mtab2});return;}
@@ -2246,6 +2583,11 @@ function attachInputEvents(){
       const el=document.getElementById(id);
       if(el)el.addEventListener("input",updateGoalPreview);
     });
+  }
+
+  if(S.rcView?.type==='log-run'){
+    const el=document.getElementById('rc-mile-time');
+    if(el)el.addEventListener('input',e=>{if(S.rcView)S.rcView.data.mileTimeStr=e.target.value;});
   }
 }
 
