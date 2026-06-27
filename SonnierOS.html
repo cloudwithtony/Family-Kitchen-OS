@@ -146,13 +146,14 @@ const FIN_SEED_ACCOUNTS=[
 // ══════════════════════════════════════════════════
 // KITCHEN DATA
 // ══════════════════════════════════════════════════
-const ALIASES={"chicken thighs":"Fresh Chicken Thighs","ground beef":"Ground Beef 85/15","ground beef (lean)":"Ground Beef 85/15","salmon":"Salmon (wild-caught)","tomatoes":"Cherry Tomatoes","potatoes":"Regular Potatoes","eggs":"Eggs (Goldhen Brown)","greek yogurt":"Greek Yogurt (Chobani)","yogurt":"Greek Yogurt (Chobani)","butter":"Irish Butter Salted","granola":"GF Granola (Purely Elizabeth)","rice":"White Rice","maple syrup":"Real Maple Syrup","shrimp":"Shrimp (raw frozen)","peppers":"Multi-Colored Peppers","lettuce":"Romaine Lettuce","romaine":"Romaine Lettuce","avocado":"Avocados","broccoli":"Broccoli"};
+const ALIASES={"garlic":"Minced Garlic","garlic cloves":"Minced Garlic","minced garlic":"Minced Garlic","shrimp":"Raw Shrimp XL","raw shrimp":"Raw Shrimp XL","tilapia":"Tilapia Fillets","tilapia fillets":"Tilapia Fillets","butter":"Butter","eggs":"Eggs","egg":"Eggs","greek yogurt":"Greek Yogurt","yogurt":"Greek Yogurt","almond milk":"Almond Milk Unsweetened Vanilla","chicken stock":"Organic Chicken Stock","chicken broth":"Organic Chicken Stock","corn tortillas":"Siete GF Tortillas","tortillas":"Siete GF Tortillas","sirloin steak":"Bottom Round Steak","steak":"Bottom Round Steak","kale":"Fresh Kale","mint":"Fresh Mint"};
 const CAT_CLR={protein:"#EF4444",dairy:"#EAB308",produce:"#22C55E",frozen:"#14B8A6",pantry:"#F97316",snack:"#A855F7",other:"#8B949E"};
 const LOC_INFO={fridge:{icon:"🧊",color:"#3B82F6",label:"Fridge"},freezer:{icon:"❄️",color:"#14B8A6",label:"Freezer"},pantry:{icon:"🏠",color:"#F97316",label:"Pantry"}};
 const STATUS_INFO={ok:{bg:"#14532D",txt:"#4ADE80",label:"✓ Good"},low:{bg:"#422006",txt:"#FB923C",label:"⚡ Low"},critical:{bg:"#450A0A",txt:"#F87171",label:"🔴 Critical"},expiring:{bg:"#431407",txt:"#FB923C",label:"⏰ Soon"},urgent:{bg:"#450A0A",txt:"#EF4444",label:"🔥 Today"},expired:{bg:"#1C1917",txt:"#78716C",label:"💀 Expired"},empty:{bg:"#111827",txt:"#6B7280",label:"📦 Empty"}};
 const PLAN_DAYS=["mon","tue","wed","thu","fri","sat","sun"];
 const DAY_LABELS={mon:"Monday",tue:"Tuesday",wed:"Wednesday",thu:"Thursday",fri:"Friday",sat:"Saturday",sun:"Sunday"};
 const FAMILY_SIZE=5;
+const KITCHEN_SEED_VERSION=2;
 
 // ══════════════════════════════════════════════════
 // SHARED HELPERS
@@ -163,76 +164,50 @@ function fmt(n){return '$'+Math.abs(n||0).toLocaleString('en-US',{minimumFractio
 function mkItem(id,name,qty,unit,loc,cat,expDays,price=0,low=0,crit=0){return{id,name,qty,unit,loc,cat,expDays,addedDate:now(),price,low,crit};}
 function emptyPlan(){const p={};PLAN_DAYS.forEach(d=>{p[d]={breakfast:null,lunch:null,dinner:null};});return p;}
 const DEFAULT_ITEMS=[
-  mkItem("a01","Eggs (Goldhen Brown)",12,"count","fridge","dairy",35,8.99,6,3),
-  mkItem("a02","Fresh Chicken Thighs",2.75,"lbs","fridge","protein",4,13.50,1,0),
-  mkItem("a03","Chicken Drumsticks",9.5,"lbs","freezer","protein",180,9.50,2,0),
-  mkItem("a04","Ground Beef 85/15",3,"packs","freezer","protein",180,35.00,1,0),
-  mkItem("a05","Pulled Beef Brisket",2,"packs","fridge","protein",5,18.30,1,0),
-  mkItem("a06","Shrimp (raw frozen)",1,"packs","freezer","protein",90,22.00,1,0),
-  mkItem("a07","Andouille Sausage",1,"count","fridge","protein",7,4.75,0,0),
-  mkItem("a08","Salmon (wild-caught)",0,"lbs","freezer","protein",180,39.00,1,0),
-  mkItem("a09","Steak",0,"lbs","freezer","protein",180,45.00,1,0),
-  mkItem("a10","Rotisserie Chicken",0,"count","fridge","protein",4,4.99,1,0),
-  mkItem("a11","Greek Yogurt (Chobani)",1,"32oz tub","fridge","dairy",7,6.99,1,0),
-  mkItem("a12","Almond Milk",2,"cartons","fridge","dairy",10,5.49,1,0),
-  mkItem("a13","Heavy Whipping Cream",1,"count","fridge","dairy",14,4.55,0,0),
-  mkItem("a14","Irish Butter Salted",1,"count","fridge","dairy",30,3.65,0,0),
-  mkItem("a15","Parmesan Wedge",1,"count","fridge","dairy",30,4.85,0,0),
-  mkItem("a16","Whole Milk Organic",1,"count","fridge","dairy",7,5.49,0,0),
-  mkItem("a17","Shredded Cheese",0,"bags","fridge","dairy",14,9.99,1,0),
-  mkItem("b01","Asparagus",1,"bunches","fridge","produce",1,6.99,0,0),
-  mkItem("b02","Cherry Tomatoes",1,"count","fridge","produce",5,5.99,0,0),
-  mkItem("b03","Romaine Lettuce",1,"bags","fridge","produce",3,5.99,0,0),
-  mkItem("b04","Kale",1,"bags","fridge","produce",3,4.99,0,0),
-  mkItem("b05","Brussels Sprouts",1,"lbs","fridge","produce",3,6.99,0,0),
-  mkItem("b06","Blueberries",2,"pints","fridge","produce",2,9.99,0,0),
-  mkItem("b07","Multi-Colored Peppers",1,"packs","fridge","produce",7,6.99,0,0),
-  mkItem("b08","Sweet Corn",1,"count","fridge","produce",4,3.25,0,0),
-  mkItem("b09","Cabbage",3,"lbs","fridge","produce",14,2.55,0,0),
-  mkItem("b10","Sweet Potatoes",1,"bags","pantry","produce",30,7.99,0,0),
-  mkItem("b11","Bananas",1,"bunches","pantry","produce",5,1.99,0,0),
-  mkItem("b12","Honeycrisp Apples",2,"bags","fridge","produce",21,9.99,0,0),
-  mkItem("b13","Navel Oranges",2,"bags","fridge","produce",14,9.99,0,0),
-  mkItem("b14","Red Onions",1,"bags","pantry","produce",30,4.99,0,0),
-  mkItem("b15","Avocados",0,"count","pantry","produce",5,6.99,2,0),
-  mkItem("b16","Broccoli",0,"heads","fridge","produce",7,5.99,1,0),
-  mkItem("c01","Pepperoni Pizza",1,"count","freezer","frozen",90,5.05,0,0),
-  mkItem("c02","Cheese Pizza",1,"count","freezer","frozen",90,5.05,0,0),
-  mkItem("c03","Chicken Nuggets GF",1,"bags","freezer","frozen",90,5.75,0,0),
-  mkItem("c04","Sausage Links",2,"packs","freezer","frozen",90,3.78,0,0),
-  mkItem("c05","French Toast Sticks",1,"boxes","freezer","frozen",90,3.49,0,0),
-  mkItem("c06","Gen Tso Chicken GF",1,"count","freezer","frozen",90,6.59,0,0),
-  mkItem("c07","French Toast Sticks (thawed)",1,"boxes","fridge","frozen",1,0,0,0),
-  mkItem("c08","Eggo Waffles (thawed)",1,"bags","fridge","frozen",1,0,0,0),
-  mkItem("d01","Real Maple Syrup",1,"bottles","pantry","pantry",365,5.85,0,0),
-  mkItem("d02","GF Cinnamon Cheerios",1,"count","pantry","pantry",180,5.45,0,0),
-  mkItem("d03","Brioche Buns",2,"packs","pantry","pantry",7,7.98,0,0),
-  mkItem("d04","Pink Himalayan Salt",1,"containers","pantry","pantry",1095,0,0,0),
-  mkItem("d05","Black Pepper",1,"containers","pantry","pantry",1095,0,0,0),
-  mkItem("d06","White Rice",0,"lbs","pantry","pantry",365,18.99,2,0),
-  mkItem("d07","Regular Potatoes",0,"lbs","pantry","pantry",30,8.99,2,0),
-  mkItem("d08","Corn Tortillas GF",0,"count","pantry","pantry",14,6.99,12,0),
-  mkItem("d09","Almond Butter",0,"jars","pantry","pantry",180,13.99,1,0),
-  mkItem("d10","GF Granola (Purely Elizabeth)",0,"bags","pantry","pantry",90,12.99,1,0),
-  mkItem("d11","Olive Oil",0,"bottles","pantry","pantry",365,15.99,1,0),
-  mkItem("d12","Chia Seeds",1,"count","pantry","pantry",365,4.09,0,0),
-  mkItem("e01","Grass-Fed Beef Sticks",1,"packs","pantry","snack",60,14.29,0,0),
+  // FRIDGE
+  mkItem("p01","Greek Yogurt",1,"container","fridge","dairy",18),
+  mkItem("p02","Almond Milk Unsweetened Vanilla",2,"carton","fridge","dairy",80),
+  mkItem("p03","Organic Chicken Stock",1,"carton","fridge","pantry",35),
+  mkItem("p04","Beef Broth",1,"carton","fridge","pantry",35),
+  mkItem("p05","Butter",4,"sticks","fridge","dairy",66),
+  mkItem("p06","Minced Garlic",1,"jar","fridge","pantry",0),
+  mkItem("p07","Fresh Mint",1,"pack","fridge","produce",7),
+  mkItem("p08","Fresh Kale",1,"bag","fridge","produce",7),
+  mkItem("p09","Siete GF Tortillas",1,"pack","fridge","pantry",35),
+  mkItem("p10","Con Queso",1,"jar","fridge","pantry",0),
+  mkItem("p11","Eggs",12,"eggs","fridge","dairy",13),
+  mkItem("p12","SmartWater",4,"bottles","fridge","pantry",0),
+  // MEAT — fridge/counter, freeze immediately
+  {...mkItem("p13","Bottom Round Steak",5,"lbs","fridge","protein",1),note:"Cook ASAP — perfect for Steak Bites + Vegetables or Tacos tonight!"},
+  // FREEZER
+  mkItem("p14","Raw Shrimp XL",1,"bag","freezer","protein",0),
+  mkItem("p15","Frozen Shrimp Family Pack",1,"bag","freezer","protein",0),
+  mkItem("p16","Tilapia Fillets",1,"bag","freezer","protein",0),
+  mkItem("p17","Beef Corn Dogs",10,"count","freezer","frozen",0),
+  mkItem("p18","Soup Dumplings",1,"box","freezer","frozen",0),
+  mkItem("p19","Cookies and Cream Ice Cream",1,"container","freezer","frozen",0),
+  mkItem("p20","Chocolate Chip Cookie Dough Ice Cream",1,"container","freezer","frozen",0),
+  mkItem("p21","Chicken Nuggets",1,"bag","freezer","frozen",0),
+  mkItem("p22","Frozen Blueberries",1,"bag","freezer","frozen",0),
+  mkItem("p23","French Toast Sticks",1,"box","freezer","frozen",0),
 ];
 const DEFAULT_RECIPES=[
-  {id:"r01",name:"Greek Yogurt Bowl",gf:true,cat:"breakfast",servings:1,ings:[{n:"Greek Yogurt (Chobani)",q:1,u:"cup"},{n:"GF Granola (Purely Elizabeth)",q:0.25,u:"bag"},{n:"Blueberries",q:0.5,u:"pint"},{n:"Almond Butter",q:0.1,u:"jar"}]},
-  {id:"r02",name:"Eggs Breakfast",gf:true,cat:"breakfast",servings:1,ings:[{n:"Eggs (Goldhen Brown)",q:3,u:"count"},{n:"Irish Butter Salted",q:0.1,u:"count"}]},
-  {id:"r03",name:"Eggs & Avocado Bowl",gf:true,cat:"breakfast",servings:2,ings:[{n:"Eggs (Goldhen Brown)",q:4,u:"count"},{n:"Avocados",q:2,u:"count"},{n:"Cherry Tomatoes",q:0.5,u:"count"}]},
-  {id:"r04",name:"GF Cheerios Bowl",gf:true,cat:"breakfast",servings:1,ings:[{n:"GF Cinnamon Cheerios",q:1,u:"serving"},{n:"Almond Milk",q:1,u:"cup"}]},
-  {id:"r05",name:"Salmon & Asparagus",gf:true,cat:"dinner",servings:2,ings:[{n:"Salmon (wild-caught)",q:1,u:"lb"},{n:"Asparagus",q:1,u:"bunch"},{n:"Irish Butter Salted",q:0.1,u:"count"}]},
-  {id:"r06",name:"Rotisserie Chicken Plate",gf:true,cat:"lunch",servings:4,ings:[{n:"Rotisserie Chicken",q:1,u:"count"},{n:"Kale",q:1,u:"bag"}]},
-  {id:"r07",name:"Chicken Rice & Vegetables",gf:true,cat:"dinner",servings:4,ings:[{n:"Fresh Chicken Thighs",q:1.5,u:"lbs"},{n:"White Rice",q:1,u:"lb"},{n:"Multi-Colored Peppers",q:0.5,u:"pack"}]},
-  {id:"r08",name:"Ground Beef & Potatoes",gf:true,cat:"dinner",servings:4,ings:[{n:"Ground Beef 85/15",q:1.5,u:"lbs"},{n:"Regular Potatoes",q:2,u:"lbs"},{n:"Red Onions",q:0.25,u:"bag"}]},
-  {id:"r09",name:"Taco Night",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef 85/15",q:1.5,u:"lbs"},{n:"Corn Tortillas GF",q:15,u:"count"},{n:"Shredded Cheese",q:0.5,u:"bag"},{n:"Romaine Lettuce",q:0.5,u:"bag"},{n:"Cherry Tomatoes",q:1,u:"count"}]},
-  {id:"r10",name:"Steak & Vegetables",gf:true,cat:"dinner",servings:2,ings:[{n:"Steak",q:1,u:"lb"},{n:"Asparagus",q:1,u:"bunch"},{n:"Regular Potatoes",q:1,u:"lb"}]},
-  {id:"r11",name:"Chicken Thighs & Broccoli",gf:true,cat:"dinner",servings:4,ings:[{n:"Fresh Chicken Thighs",q:1.5,u:"lbs"},{n:"Broccoli",q:1,u:"head"}]},
-  {id:"r12",name:"Shrimp Stir Fry",gf:true,cat:"dinner",servings:3,ings:[{n:"Shrimp (raw frozen)",q:1,u:"pack"},{n:"Multi-Colored Peppers",q:1,u:"pack"},{n:"Kale",q:0.5,u:"bag"},{n:"Cabbage",q:0.5,u:"lb"}]},
-  {id:"r13",name:"Brisket & Cabbage Bowl",gf:true,cat:"dinner",servings:4,ings:[{n:"Pulled Beef Brisket",q:1,u:"pack"},{n:"Cabbage",q:0.5,u:"lb"},{n:"Multi-Colored Peppers",q:0.5,u:"pack"}]},
-  {id:"r14",name:"Gen Tso's Chicken",gf:true,cat:"dinner",servings:3,ings:[{n:"Gen Tso Chicken GF",q:1,u:"count"}]},
+  {id:"r01",name:"Baked Cajun Chicken Thighs",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:2,u:"lb"},{n:"Cajun Seasoning",q:2,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r02",name:"BBQ Chicken Thighs",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:2,u:"lb"},{n:"BBQ Sauce",q:0.5,u:"cup"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Smoked Paprika",q:1,u:"tsp"},{n:"Corn on the Cob",q:4,u:"count"}]},
+  {id:"r03",name:"Southwest Chicken Thigh Salad",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"Romaine Lettuce",q:1,u:"head"},{n:"Black Beans",q:1,u:"can"},{n:"Corn",q:1,u:"can"},{n:"Avocado",q:1,u:"count"},{n:"Cherry Tomatoes",q:1,u:"cup"},{n:"Lime",q:1,u:"count"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
+  {id:"r04",name:"Maple Cajun Glazed Salmon",gf:true,cat:"dinner",servings:4,ings:[{n:"Salmon Fillets",q:4,u:"count"},{n:"Raw Maple Syrup",q:2,u:"tbsp"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Lemon",q:1,u:"count"}]},
+  {id:"r05",name:"Steak Bites + Vegetables",gf:true,cat:"dinner",servings:5,ings:[{n:"Sirloin Steak",q:1.5,u:"lb"},{n:"Butter",q:0.25,u:"stick"},{n:"Minced Garlic",q:0.13,u:"jar"},{n:"Rosemary",q:1,u:"tsp"},{n:"Broccoli",q:2,u:"cups"},{n:"Zucchini",q:2,u:"count"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r06",name:"Hamburgers",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:2,u:"lb"},{n:"GF Burger Buns",q:4,u:"count"},{n:"Lettuce",q:1,u:"head"},{n:"Tomato",q:2,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"},{n:"Garlic Powder",q:1,u:"tsp"}]},
+  {id:"r07",name:"Tacos",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:1.5,u:"lb"},{n:"Corn Tortillas",q:8,u:"count"},{n:"Taco Seasoning",q:1,u:"packet"},{n:"Lettuce",q:1,u:"head"},{n:"Tomato",q:2,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Lime",q:1,u:"count"},{n:"Salsa",q:0.5,u:"cup"}]},
+  {id:"r08",name:"Dirty Spaghetti",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:1.5,u:"lb"},{n:"GF Spaghetti",q:12,u:"oz"},{n:"Diced Tomatoes",q:1,u:"can"},{n:"Tomato Paste",q:2,u:"tbsp"},{n:"Bell Pepper",q:1,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Minced Garlic",q:0.13,u:"jar"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
+  {id:"r09",name:"Shrimp Fried Rice",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"White Rice",q:2,u:"cups"},{n:"Eggs",q:3,u:"eggs"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Frozen Peas and Carrots",q:1,u:"cup"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Green Onions",q:3,u:"count"},{n:"Sesame Oil",q:1,u:"tsp"}]},
+  {id:"r10",name:"Chicken Fried Rice",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"White Rice",q:2,u:"cups"},{n:"Eggs",q:3,u:"eggs"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Frozen Peas and Carrots",q:1,u:"cup"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Green Onions",q:3,u:"count"},{n:"Sesame Oil",q:1,u:"tsp"}]},
+  {id:"r11",name:"Mom's Shrimp Ceviche",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"Avocado",q:2,u:"count"},{n:"Lime Juice",q:0.5,u:"cup"},{n:"Tomato",q:2,u:"count"},{n:"Red Onion",q:1,u:"count"},{n:"Cilantro",q:0.5,u:"cup"},{n:"Jalapeño",q:1,u:"count"},{n:"Salt",q:1,u:"to taste"}]},
+  {id:"r12",name:"Garlic Butter Shrimp + Broccoli",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"Butter",q:0.25,u:"stick"},{n:"Minced Garlic",q:0.17,u:"jar"},{n:"Broccoli",q:3,u:"cups"},{n:"Lemon",q:1,u:"count"},{n:"Red Pepper Flakes",q:0.5,u:"tsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r13",name:"Ground Turkey Lettuce Wraps",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Turkey",q:1.5,u:"lb"},{n:"Butter Lettuce",q:1,u:"head"},{n:"Coconut Aminos",q:2,u:"tbsp"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Ginger",q:1,u:"tsp"},{n:"Green Onions",q:3,u:"count"},{n:"Water Chestnuts",q:1,u:"can"},{n:"Sesame Oil",q:1,u:"tsp"}]},
+  {id:"r14",name:"Lemon Herb Baked Tilapia",gf:true,cat:"dinner",servings:4,ings:[{n:"Tilapia Fillets",q:1,u:"bag"},{n:"Lemon",q:2,u:"count"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Dried Parsley",q:1,u:"tsp"},{n:"Paprika",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r15",name:"Chicken Thigh Stir Fry",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"Bell Pepper",q:2,u:"count"},{n:"Zucchini",q:2,u:"count"},{n:"Broccoli",q:2,u:"cups"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Ginger",q:1,u:"tsp"},{n:"Sesame Oil",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
+  {id:"r16",name:"Salmon Patties",gf:true,cat:"dinner",servings:5,ings:[{n:"Canned Salmon",q:2,u:"cans"},{n:"Eggs",q:2,u:"eggs"},{n:"Almond Flour",q:0.25,u:"cup"},{n:"Green Onions",q:3,u:"count"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Cajun Seasoning",q:1,u:"tsp"},{n:"Olive Oil",q:2,u:"tbsp"}]},
 ];
 // ══════════════════════════════════════════════════
 // STATE
@@ -469,12 +444,22 @@ function itemStatus(item){
 // BUGFIX: prefer an in-stock match over a depleted item sharing the same name
 function resolveItem(name){
   const key=name.toLowerCase().trim();
-  const resolved=(ALIASES[key]||name).toLowerCase();
-  const all=S.items.filter(i=>i.name.toLowerCase()===resolved||i.name.toLowerCase()===key);
+  const resolved=(ALIASES[key]||name).toLowerCase().trim();
+  const all=S.items.filter(i=>{const n=i.name.toLowerCase().trim();return n===resolved||n===key;});
   return all.find(i=>i.qty>0)||all[0];
 }
 function alertCount(){
   return S.items.filter(i=>["urgent","expired","expiring"].includes(itemStatus(i))&&i.qty>0).length;
+}
+const SHOP_CAT_MAP={protein:"Proteins",produce:"Produce",frozen:"Frozen",dairy:"Pantry Staples",pantry:"Pantry Staples",snack:"Pantry Staples",other:"Pantry Staples"};
+const SHOP_CAT_ORDER=["Proteins","Produce","Pantry Staples","Frozen"];
+function shopCategory(name,cat){
+  if(cat&&SHOP_CAT_MAP[cat])return SHOP_CAT_MAP[cat];
+  const n=name.toLowerCase();
+  if(/chicken|beef|steak|salmon|shrimp|turkey|tilapia|sirloin|bacon|sausage|pork|tuna/.test(n))return"Proteins";
+  if(/lettuce|tomato|onion|garlic|lime|lemon|avocado|broccoli|zucchini|pepper|cilantro|ginger|cucumber|kale|mint|jalape|green onion|celery|carrot|romaine|corn on the cob/.test(n))return"Produce";
+  if(/frozen|ice cream|fries/.test(n))return"Frozen";
+  return"Pantry Staples";
 }
 
 // ── sync helpers (keep modal text inputs in S without forcing a re-render) ──
@@ -1935,7 +1920,7 @@ function kitchenShopTab(){
         if(need>0){
           const k=(f?.name||i.n).toLowerCase();
           if(needed[k])needed[k].need=parseFloat((needed[k].need+need).toFixed(2));
-          else needed[k]={name:f?.name||i.n,need,unit:i.u,price:f?.price||0};
+          else needed[k]={name:f?.name||i.n,need,unit:i.u,price:f?.price||0,cat:shopCategory(f?.name||i.n,f?.cat)};
         }
       });
     });
@@ -1951,22 +1936,34 @@ function kitchenShopTab(){
   const list=Object.values(needed).sort((a,b)=>a.name.localeCompare(b.name));
   const hasPrices=list.some(i=>i.price>0&&!S.shopBought[i.name]);
   const total=list.filter(i=>!S.shopBought[i.name]&&i.price>0).reduce((s,i)=>s+i.price,0);
+  const catIcon={Proteins:"🥩",Produce:"🥦",Frozen:"🧊",["Pantry Staples"]:"🥫"};
+  function itemRow(i){
+    const bought=S.shopBought[i.name];
+    return`<div data-action="toggle-bought" data-item="${esc(i.name)}" style="background:${bought?"#0F2A1A":"var(--card)"};border-radius:12px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;border:1px solid ${bought?"#166534":"var(--border)"};opacity:${bought?.6:1}">
+      <div style="width:24px;height:24px;border-radius:6px;border:2px solid ${bought?"#22C55E":"var(--border)"};background:${bought?"#22C55E":"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${bought?"<span style='color:#fff;font-size:14px;font-weight:700'>✓</span>":""}
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px;color:#E8EEF8;text-decoration:${bought?"line-through":"none"}">${esc(i.name)}</div>
+        <div style="font-size:11px;color:var(--t2)">Need ${i.need} ${esc(i.unit)}</div>
+      </div>
+      ${i.price>0?`<div style="font-weight:700;color:#22C55E;font-size:14px">$${i.price.toFixed(2)}</div>`:""}
+    </div>`;
+  }
   return`<div class="scroll fade" style="padding-top:8px">
     <div style="background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
       <div><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ITEMS TO BUY</div><div style="font-size:26px;font-weight:800;color:#3B82F6">${list.length}</div></div>
       ${hasPrices?`<div style="text-align:right"><div style="font-size:10px;color:var(--t2);margin-bottom:2px">EST. COST</div><div style="font-size:26px;font-weight:800;color:#22C55E">$${total.toFixed(2)}</div></div>`:""}
     </div>
     ${list.length===0?`<div style="text-align:center;padding:40px 0;color:var(--t2)">🎉 You have everything for this week!</div>`:
-      list.map(i=>{const bought=S.shopBought[i.name];return`<div data-action="toggle-bought" data-item="${esc(i.name)}" style="background:${bought?"#0F2A1A":"var(--card)"};border-radius:12px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;border:1px solid ${bought?"#166534":"var(--border)"};opacity:${bought?.6:1}">
-        <div style="width:24px;height:24px;border-radius:6px;border:2px solid ${bought?"#22C55E":"var(--border)"};background:${bought?"#22C55E":"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          ${bought?"<span style='color:#fff;font-size:14px;font-weight:700'>✓</span>":""}
-        </div>
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:13px;color:#E8EEF8;text-decoration:${bought?"line-through":"none"}">${esc(i.name)}</div>
-          <div style="font-size:11px;color:var(--t2)">Need ${i.need} ${esc(i.unit)}</div>
-        </div>
-        ${i.price>0?`<div style="font-weight:700;color:#22C55E;font-size:14px">$${i.price.toFixed(2)}</div>`:""}
-      </div>`;}).join("")}
+      SHOP_CAT_ORDER.map(secCat=>{
+        const items=list.filter(i=>i.cat===secCat);
+        if(!items.length)return"";
+        return`<div style="margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;letter-spacing:.06em">${catIcon[secCat]} ${secCat.toUpperCase()}</div>
+          ${items.map(itemRow).join("")}
+        </div>`;
+      }).join("")}
   </div>`;
 }
 
@@ -1992,7 +1989,7 @@ function kitchenAlertsTab(){
   return`<div class="scroll fade" style="padding-top:8px">
     ${total===0?`<div style="text-align:center;padding:60px 0"><div style="font-size:48px;margin-bottom:12px">🎉</div><div style="font-size:18px;font-weight:700;color:#22C55E">All clear!</div><div style="color:var(--t2);font-size:13px;margin-top:6px">No alerts right now.</div></div>`:`
       ${section("💀 EXPIRED — DISCARD NOW","#EF4444",exp,()=>"Past expiry — throw out")}
-      ${section("🔥 USE TODAY OR TOMORROW","#F97316",urg,(i,d)=>d<=0?"Expired today":"Expires tomorrow")}
+      ${section("🔥 USE TODAY OR TOMORROW","#EF4444",urg,(i,d)=>(d<=0?"Expired today":"Expires tomorrow")+(i.note?" — "+i.note:""))}
       ${section("⏰ USE WITHIN 3 DAYS","#EAB308",soon,(i,d)=>`${d} day${d!==1?"s":""} remaining`)}
       ${section("🛒 REORDER SOON","#3B82F6",reord,i=>`${i.qty} ${i.unit} left — below reorder level`)}`}
   </div>`;
@@ -2595,19 +2592,26 @@ function attachInputEvents(){
 // INIT
 // ══════════════════════════════════════════════════
 function init(){
-  let items,recipes,plan,log,fitLog;
+  let items,recipes,plan,log,fitLog,seedV;
   try{items=JSON.parse(localStorage.getItem("fk-items"));}catch{}
   try{recipes=JSON.parse(localStorage.getItem("fk-recipes"));}catch{}
   try{plan=JSON.parse(localStorage.getItem("fk-plan"));}catch{}
   try{log=JSON.parse(localStorage.getItem("fk-log"));}catch{}
   try{fitLog=JSON.parse(localStorage.getItem("fk-fit"));}catch{}
-  S.items=items&&items.length>0?items:DEFAULT_ITEMS;
-  S.recipes=recipes&&recipes.length>0?recipes:DEFAULT_RECIPES;
+  try{seedV=parseInt(localStorage.getItem("fk-seed-v"))||0;}catch{seedV=0;}
+  const reseed=seedV<KITCHEN_SEED_VERSION;
+  S.items=(items&&items.length>0&&!reseed)?items:DEFAULT_ITEMS;
+  S.recipes=(recipes&&recipes.length>0&&!reseed)?recipes:DEFAULT_RECIPES;
   S.weekPlan=plan||emptyPlan();
   S.cookLog=log||[];
   S.fit.fitLog=fitLog||[];
-  if(!items||!items.length)saveItems();
-  if(!recipes||!recipes.length)saveRecipes();
+  if(reseed){
+    saveItems();saveRecipes();
+    try{localStorage.setItem("fk-seed-v",String(KITCHEN_SEED_VERSION));}catch{}
+  }else{
+    if(!items||!items.length)saveItems();
+    if(!recipes||!recipes.length)saveRecipes();
+  }
   if(!plan)saveWeekPlan();
   render();
   document.getElementById("app").addEventListener("click",handleClick);
