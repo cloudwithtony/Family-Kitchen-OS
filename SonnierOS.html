@@ -1989,6 +1989,7 @@ function kitchenPantryTab(){
                 ${!isEmpty&&d!==null&&d<=7?`<span style="font-size:10px;color:${d<=1?"#EF4444":"#F97316"}">${d<=0?"expired":d===1?"1 day":d+" days"}</span>`:""}
               </div>
             </div>
+            <button data-action="del-item" data-id="${i.id}" style="flex-shrink:0;width:22px;height:22px;border-radius:6px;background:transparent;color:#3A4D66;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
               <button data-action="dec" data-id="${i.id}" style="width:34px;height:34px;border-radius:50%;background:${isEmpty?"#3A2426":"#7F1D1D"};color:${isEmpty?"#6B5759":"#fff"};font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)">−</button>
               <div style="text-align:center;min-width:30px">
@@ -2715,6 +2716,13 @@ function handleClick(e){
     const item=updated.find(i=>i.id===btn.dataset.id);
     setState({items:updated});saveItems();
     if(item&&item.qty===0)showToast('📦 '+item.name+' is empty');
+    return;
+  }
+  if(a==='del-item'){
+    const item=S.items.find(i=>i.id===btn.dataset.id);
+    const updated=S.items.filter(i=>i.id!==btn.dataset.id);
+    setState({items:updated});saveItems();
+    showToast(`"${item?.name}" removed from pantry`);
     return;
   }
   if(a==='start-cook'){
