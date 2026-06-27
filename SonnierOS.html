@@ -1265,7 +1265,7 @@ function financeAccounts(){
         ${linkedGoal?`<div style="font-size:11px;color:#4A5D7A;background:#0D1628;border-radius:8px;padding:7px 10px;margin-bottom:10px">🎯 Saving for: <span style="color:#F0F4FF;font-weight:600">${esc(linkedGoal.name)}</span></div>`:''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <button data-action="fin-update-balance" data-idx="${i}" style="padding:10px;background:linear-gradient(135deg,#1A2840,#111B2E);border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:700;color:#3B82F6">Update Balance</button>
-          <button data-action="fin-update-balance" data-idx="${i}" style="padding:10px;background:#111B2E;border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:600;color:#94A3B8">+ Transaction</button>
+          <button data-action="fin-open-transaction" data-idx="${i}" style="padding:10px;background:#111B2E;border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:600;color:#94A3B8">+ Transaction</button>
         </div>
       </div>`;
     }).join('')}
@@ -1432,6 +1432,29 @@ function financeModal(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <button data-action="fin-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
         <button data-action="fin-confirm-balance" style="padding:14px;background:linear-gradient(135deg,#047857,#10B981);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Update ✓</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='transaction'){
+    const d=loadVF();const a=d.accounts[v.idx];
+    const mode=v.mode||'credit';
+    const amt=parseFloat(v.amt)||0;
+    const newBal=(a?.balance||0)+(mode==='credit'?amt:-amt);
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Log Transaction</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:18px">${esc(a?.name)} · ${esc(a?.institution||'')}</div>
+      <div style="font-size:14px;color:#4A5D7A;margin-bottom:14px">Current: <strong style="color:#F0F4FF">${finFmt(a?.balance)}</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <button data-action="fin-tx-mode" data-mode="credit" style="padding:13px;border-radius:12px;font-size:13px;font-weight:700;border:1.5px solid ${mode==='credit'?'#10B981':'#1E2D45'};background:${mode==='credit'?'#10B98122':'#111B2E'};color:${mode==='credit'?'#10B981':'#94A3B8'}">⬆ Credit (add)</button>
+        <button data-action="fin-tx-mode" data-mode="debit" style="padding:13px;border-radius:12px;font-size:13px;font-weight:700;border:1.5px solid ${mode==='debit'?'#EF4444':'#1E2D45'};background:${mode==='debit'?'#EF444422':'#111B2E'};color:${mode==='debit'?'#EF4444':'#94A3B8'}">⬇ Debit (subtract)</button>
+      </div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">AMOUNT ($)</label>
+      <input id="fin-tx-amt" type="number" placeholder="0.00" value="${v.amt||''}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:14px;font-size:26px;font-weight:800;color:#F0F4FF;margin-bottom:14px">
+      <div id="fin-tx-preview" style="padding:12px 14px;background:#0D1628;border:1px solid #1A2840;border-radius:10px;font-size:12px;color:#4A5D7A;margin-bottom:20px">New balance: <strong style="color:${newBal<0?'#EF4444':'#F0F4FF'}">${finFmt(newBal)}</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="fin-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="fin-confirm-tx" style="padding:14px;background:linear-gradient(135deg,#047857,#10B981);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Confirm ✓</button>
       </div>
     </div></div>`;
   }
@@ -2482,6 +2505,21 @@ function handleClick(e){
     saveVF(d);setState({finView:null});showToast('Balance updated ✓');return;
   }
 
+  if(a==='fin-open-transaction'){setState({finView:{type:'transaction',idx:parseInt(btn.dataset.idx),mode:'credit',amt:''}});return;}
+  if(a==='fin-tx-mode'){S.finView.mode=btn.dataset.mode;render();return;}
+
+  if(a==='fin-confirm-tx'){
+    const amt=parseFloat(document.getElementById('fin-tx-amt')?.value)||0;
+    if(amt<=0){showToast('Enter an amount');return;}
+    const idx=S.finView.idx;const mode=S.finView.mode||'credit';
+    const d=loadVF();const acct=d.accounts[idx];
+    if(!acct){setState({finView:null});return;}
+    acct.balance=parseFloat((acct.balance+(mode==='credit'?amt:-amt)).toFixed(2));
+    acct.lastUpdated=new Date().toISOString();
+    saveVF(d);setState({finView:null});
+    showToast(`${mode==='credit'?'+':'−'}${finFmt(amt,false)} ${mode==='credit'?'credited to':'debited from'} ${acct.name}`);return;
+  }
+
   if(a==='fin-confirm-link'){
     const goalIdx=parseInt(btn.dataset.goal);
     const acctIdx=parseInt(btn.dataset.acct);
@@ -2728,6 +2766,22 @@ function attachInputEvents(){
   if(S.rcView?.type==='log-run'){
     const el=document.getElementById('rc-mile-time');
     if(el)el.addEventListener('input',e=>{if(S.rcView)S.rcView.data.mileTimeStr=e.target.value;});
+  }
+
+  if(S.finView?.type==='transaction'){
+    const updateTxPreview=()=>{
+      const amtStr=document.getElementById('fin-tx-amt')?.value||'';
+      S.finView.amt=amtStr;
+      const prev=document.getElementById('fin-tx-preview');
+      if(!prev)return;
+      const amt=parseFloat(amtStr)||0;
+      const d=loadVF();const acct=d.accounts[S.finView.idx];
+      const mode=S.finView.mode||'credit';
+      const newBal=(acct?.balance||0)+(mode==='credit'?amt:-amt);
+      prev.innerHTML=`New balance: <strong style="color:${newBal<0?'#EF4444':'#F0F4FF'}">${finFmt(newBal)}</strong>`;
+    };
+    const el=document.getElementById('fin-tx-amt');
+    if(el)el.addEventListener('input',updateTxPreview);
   }
 }
 
