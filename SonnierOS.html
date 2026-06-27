@@ -132,8 +132,8 @@ const FIN_SEED_FUNDS=[
   {id:'date',     name:'Date Night',    weekly:50, icon:'💙',color:'#8B5CF6',mission:'exp'},
   {id:'travel',   name:'Travel Fund',   weekly:50, icon:'✈️',color:'#06B6D4',mission:'exp'},
 ];
-const FIN_ACCT_TYPES={checking:'CHECKING',savings:'SAVINGS',hysa:'HI-YIELD',invest:'INVEST',business:'BUSINESS'};
-const FIN_ACCT_COLORS={checking:'#3B82F6',savings:'#10B981',hysa:'#06B6D4',invest:'#F59E0B',business:'#8B5CF6'};
+const FIN_ACCT_TYPES={checking:'CHECKING',savings:'SAVINGS',hysa:'HI-YIELD',invest:'INVEST',business:'BUSINESS',kid:'KID FUND'};
+const FIN_ACCT_COLORS={checking:'#3B82F6',savings:'#10B981',hysa:'#06B6D4',invest:'#F59E0B',business:'#8B5CF6',kid:'#EC4899'};
 const FIN_SEED_ACCOUNTS=[
   {id:'cap1_spend', name:'Spending',          institution:'Capital One',type:'checking',balance:24.63,   last4:'5000',lastUpdated:new Date().toISOString()},
   {id:'cap1_invest',name:'Investment Account', institution:'Capital One',type:'invest',  balance:2951.04, last4:'8369',lastUpdated:new Date().toISOString()},
@@ -141,6 +141,12 @@ const FIN_SEED_ACCOUNTS=[
   {id:'cap1_kids',  name:'Kids\' Fund',        institution:'Capital One',type:'savings', balance:0.60,    last4:'6331',lastUpdated:new Date().toISOString()},
   {id:'cap1_emerg', name:'Emergency',          institution:'Capital One',type:'savings', balance:312.29,  last4:'8064',lastUpdated:new Date().toISOString()},
   {id:'cap1_travel',name:'Travel Fund',        institution:'Capital One',type:'savings', balance:205.17,  last4:'8587',lastUpdated:new Date().toISOString()},
+];
+// Per-kid "portfolios" — credited automatically when a Run Club payout is marked paid (see rcMarkPaid).
+const KID_SEED_ACCOUNTS=[
+  {id:'kid_noah',  name:"Noah's Fund",   institution:'Run Club Earnings', type:'kid', balance:0, lastUpdated:new Date().toISOString()},
+  {id:'kid_zayden',name:"Zayden's Fund", institution:'Run Club Earnings', type:'kid', balance:0, lastUpdated:new Date().toISOString()},
+  {id:'kid_iris',  name:"Iris' Fund",    institution:'Run Club Earnings', type:'kid', balance:0, lastUpdated:new Date().toISOString()},
 ];
 
 // ══════════════════════════════════════════════════
@@ -276,12 +282,21 @@ function finInitData(){
   return{anthon:1030,lexi:580,
     bills:FIN_SEED_BILLS.map(b=>({...b})),
     funds:FIN_SEED_FUNDS.map(f=>({...f})),
-    goals:[],weeks:[],accounts:FIN_SEED_ACCOUNTS.map(a=>({...a}))};
+    goals:[],weeks:[],accounts:[...FIN_SEED_ACCOUNTS,...KID_SEED_ACCOUNTS].map(a=>({...a}))};
+}
+// BUGFIX: additive only — never overwrite accounts the family already has (see kitchen meals reseed bug).
+function ensureKidAccounts(d){
+  let changed=false;
+  KID_SEED_ACCOUNTS.forEach(seed=>{
+    if(!d.accounts.some(a=>a.id===seed.id)){d.accounts.push({...seed});changed=true;}
+  });
+  return changed;
 }
 function loadVF(){
   try{
     const d=JSON.parse(localStorage.getItem('vf'))||finInitData();
     if(!d.accounts||d.accounts.length===0){d.accounts=FIN_SEED_ACCOUNTS.map(a=>({...a}));saveVF(d);}
+    if(ensureKidAccounts(d))saveVF(d);
     return d;
   }catch{return finInitData();}
 }
@@ -409,8 +424,41 @@ function rcLogRun({person,laps,effort,mileTimeStr}){
   return entry;
 }
 function rcDeleteLog(id){const d=loadRC();d.logs=d.logs.filter(l=>l.id!==id);saveRC(d);}
-function rcMarkPaid(person,weekKey){const d=loadRC();d.paid[`${person}_${weekKey}`]=true;saveRC(d);}
-function rcUnmarkPaid(person,weekKey){const d=loadRC();delete d.paid[`${person}_${weekKey}`];saveRC(d);}
+
+const RC_KID_ACCOUNT={noah:'kid_noah',zayden:'kid_zayden',iris:'kid_iris'};
+function creditKidAccount(person,amount){
+  const acctId=RC_KID_ACCOUNT[person];
+  if(!acctId||!amount)return;
+  const d=loadVF();
+  const acct=d.accounts.find(a=>a.id===acctId);
+  if(!acct)return;
+  acct.balance=parseFloat((acct.balance+amount).toFixed(2));
+  acct.lastUpdated=new Date().toISOString();
+  saveVF(d);
+}
+// Marking a week paid deposits that week's earnings into the kid's Finance account;
+// unmarking reverses the deposit so the books stay in sync either way.
+function rcMarkPaid(person,weekKey){
+  const d=loadRC();
+  const key=`${person}_${weekKey}`;
+  if(d.paid[key])return 0;
+  const{stats}=rcWeekStats(d,weekKey);
+  const amount=stats[person]?.total||0;
+  d.paid[key]=true;
+  saveRC(d);
+  if(amount>0)creditKidAccount(person,amount);
+  return amount;
+}
+function rcUnmarkPaid(person,weekKey){
+  const d=loadRC();
+  const key=`${person}_${weekKey}`;
+  if(!d.paid[key])return;
+  const{stats}=rcWeekStats(d,weekKey);
+  const amount=stats[person]?.total||0;
+  delete d.paid[key];
+  saveRC(d);
+  if(amount>0)creditKidAccount(person,-amount);
+}
 // ══════════════════════════════════════════════════
 // MISSIONS HELPERS
 // ══════════════════════════════════════════════════
@@ -2407,7 +2455,12 @@ function handleClick(e){
   if(a==='rc-lap-dec'){S.rcView.data.laps=Math.max(0,(S.rcView.data.laps||0)-1);render();return;}
   if(a==='rc-save-log'){rcSaveLog();render();return;}
   if(a==='rc-del-log'){rcDeleteLog(btn.dataset.id);render();return;}
-  if(a==='rc-mark-paid'){rcMarkPaid(btn.dataset.person,btn.dataset.week);render();return;}
+  if(a==='rc-mark-paid'){
+    const amount=rcMarkPaid(btn.dataset.person,btn.dataset.week);
+    const p=rcPerson(btn.dataset.person);
+    if(amount>0&&RC_KID_ACCOUNT[btn.dataset.person])showToast(`💰 $${amount.toFixed(2)} added to ${p.name}'s fund!`);
+    render();return;
+  }
   if(a==='rc-unmark-paid'){rcUnmarkPaid(btn.dataset.person,btn.dataset.week);render();return;}
   // ── kitchen ──
   if(a==='k-tab'){setState({kTab:btn.dataset.ktab});return;}
