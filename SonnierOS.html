@@ -153,7 +153,7 @@ const STATUS_INFO={ok:{bg:"#14532D",txt:"#4ADE80",label:"✓ Good"},low:{bg:"#42
 const PLAN_DAYS=["mon","tue","wed","thu","fri","sat","sun"];
 const DAY_LABELS={mon:"Monday",tue:"Tuesday",wed:"Wednesday",thu:"Thursday",fri:"Friday",sat:"Saturday",sun:"Sunday"};
 const FAMILY_SIZE=5;
-const KITCHEN_SEED_VERSION=2;
+const KITCHEN_SEED_VERSION=3;
 
 // ══════════════════════════════════════════════════
 // SHARED HELPERS
@@ -191,24 +191,41 @@ const DEFAULT_ITEMS=[
   mkItem("p22","Frozen Blueberries",1,"bag","freezer","frozen",0),
   mkItem("p23","French Toast Sticks",1,"box","freezer","frozen",0),
 ];
-const DEFAULT_RECIPES=[
-  {id:"r01",name:"Baked Cajun Chicken Thighs",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:2,u:"lb"},{n:"Cajun Seasoning",q:2,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
-  {id:"r02",name:"BBQ Chicken Thighs",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:2,u:"lb"},{n:"BBQ Sauce",q:0.5,u:"cup"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Smoked Paprika",q:1,u:"tsp"},{n:"Corn on the Cob",q:4,u:"count"}]},
-  {id:"r03",name:"Southwest Chicken Thigh Salad",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"Romaine Lettuce",q:1,u:"head"},{n:"Black Beans",q:1,u:"can"},{n:"Corn",q:1,u:"can"},{n:"Avocado",q:1,u:"count"},{n:"Cherry Tomatoes",q:1,u:"cup"},{n:"Lime",q:1,u:"count"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
-  {id:"r04",name:"Maple Cajun Glazed Salmon",gf:true,cat:"dinner",servings:4,ings:[{n:"Salmon Fillets",q:4,u:"count"},{n:"Raw Maple Syrup",q:2,u:"tbsp"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Lemon",q:1,u:"count"}]},
-  {id:"r05",name:"Steak Bites + Vegetables",gf:true,cat:"dinner",servings:5,ings:[{n:"Sirloin Steak",q:1.5,u:"lb"},{n:"Butter",q:0.25,u:"stick"},{n:"Minced Garlic",q:0.13,u:"jar"},{n:"Rosemary",q:1,u:"tsp"},{n:"Broccoli",q:2,u:"cups"},{n:"Zucchini",q:2,u:"count"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
-  {id:"r06",name:"Hamburgers",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:2,u:"lb"},{n:"GF Burger Buns",q:4,u:"count"},{n:"Lettuce",q:1,u:"head"},{n:"Tomato",q:2,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"},{n:"Garlic Powder",q:1,u:"tsp"}]},
-  {id:"r07",name:"Tacos",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:1.5,u:"lb"},{n:"Corn Tortillas",q:8,u:"count"},{n:"Taco Seasoning",q:1,u:"packet"},{n:"Lettuce",q:1,u:"head"},{n:"Tomato",q:2,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Lime",q:1,u:"count"},{n:"Salsa",q:0.5,u:"cup"}]},
-  {id:"r08",name:"Dirty Spaghetti",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:1.5,u:"lb"},{n:"GF Spaghetti",q:12,u:"oz"},{n:"Diced Tomatoes",q:1,u:"can"},{n:"Tomato Paste",q:2,u:"tbsp"},{n:"Bell Pepper",q:1,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Minced Garlic",q:0.13,u:"jar"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
-  {id:"r09",name:"Shrimp Fried Rice",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"White Rice",q:2,u:"cups"},{n:"Eggs",q:3,u:"eggs"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Frozen Peas and Carrots",q:1,u:"cup"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Green Onions",q:3,u:"count"},{n:"Sesame Oil",q:1,u:"tsp"}]},
-  {id:"r10",name:"Chicken Fried Rice",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"White Rice",q:2,u:"cups"},{n:"Eggs",q:3,u:"eggs"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Frozen Peas and Carrots",q:1,u:"cup"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Green Onions",q:3,u:"count"},{n:"Sesame Oil",q:1,u:"tsp"}]},
-  {id:"r11",name:"Mom's Shrimp Ceviche",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"Avocado",q:2,u:"count"},{n:"Lime Juice",q:0.5,u:"cup"},{n:"Tomato",q:2,u:"count"},{n:"Red Onion",q:1,u:"count"},{n:"Cilantro",q:0.5,u:"cup"},{n:"Jalapeño",q:1,u:"count"},{n:"Salt",q:1,u:"to taste"}]},
-  {id:"r12",name:"Garlic Butter Shrimp + Broccoli",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"Butter",q:0.25,u:"stick"},{n:"Minced Garlic",q:0.17,u:"jar"},{n:"Broccoli",q:3,u:"cups"},{n:"Lemon",q:1,u:"count"},{n:"Red Pepper Flakes",q:0.5,u:"tsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
-  {id:"r13",name:"Ground Turkey Lettuce Wraps",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Turkey",q:1.5,u:"lb"},{n:"Butter Lettuce",q:1,u:"head"},{n:"Coconut Aminos",q:2,u:"tbsp"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Ginger",q:1,u:"tsp"},{n:"Green Onions",q:3,u:"count"},{n:"Water Chestnuts",q:1,u:"can"},{n:"Sesame Oil",q:1,u:"tsp"}]},
-  {id:"r14",name:"Lemon Herb Baked Tilapia",gf:true,cat:"dinner",servings:4,ings:[{n:"Tilapia Fillets",q:1,u:"bag"},{n:"Lemon",q:2,u:"count"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Dried Parsley",q:1,u:"tsp"},{n:"Paprika",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
-  {id:"r15",name:"Chicken Thigh Stir Fry",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"Bell Pepper",q:2,u:"count"},{n:"Zucchini",q:2,u:"count"},{n:"Broccoli",q:2,u:"cups"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Ginger",q:1,u:"tsp"},{n:"Sesame Oil",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
-  {id:"r16",name:"Salmon Patties",gf:true,cat:"dinner",servings:5,ings:[{n:"Canned Salmon",q:2,u:"cans"},{n:"Eggs",q:2,u:"eggs"},{n:"Almond Flour",q:0.25,u:"cup"},{n:"Green Onions",q:3,u:"count"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Cajun Seasoning",q:1,u:"tsp"},{n:"Olive Oil",q:2,u:"tbsp"}]},
+const OLD_RECIPES=[
+  {id:"r01",name:"Greek Yogurt Bowl",gf:true,cat:"breakfast",servings:1,ings:[{n:"Greek Yogurt (Chobani)",q:1,u:"cup"},{n:"GF Granola (Purely Elizabeth)",q:0.25,u:"bag"},{n:"Blueberries",q:0.5,u:"pint"},{n:"Almond Butter",q:0.1,u:"jar"}]},
+  {id:"r02",name:"Eggs Breakfast",gf:true,cat:"breakfast",servings:1,ings:[{n:"Eggs (Goldhen Brown)",q:3,u:"count"},{n:"Irish Butter Salted",q:0.1,u:"count"}]},
+  {id:"r03",name:"Eggs & Avocado Bowl",gf:true,cat:"breakfast",servings:2,ings:[{n:"Eggs (Goldhen Brown)",q:4,u:"count"},{n:"Avocados",q:2,u:"count"},{n:"Cherry Tomatoes",q:0.5,u:"count"}]},
+  {id:"r04",name:"GF Cheerios Bowl",gf:true,cat:"breakfast",servings:1,ings:[{n:"GF Cinnamon Cheerios",q:1,u:"serving"},{n:"Almond Milk",q:1,u:"cup"}]},
+  {id:"r05",name:"Salmon & Asparagus",gf:true,cat:"dinner",servings:2,ings:[{n:"Salmon (wild-caught)",q:1,u:"lb"},{n:"Asparagus",q:1,u:"bunch"},{n:"Irish Butter Salted",q:0.1,u:"count"}]},
+  {id:"r06",name:"Rotisserie Chicken Plate",gf:true,cat:"lunch",servings:4,ings:[{n:"Rotisserie Chicken",q:1,u:"count"},{n:"Kale",q:1,u:"bag"}]},
+  {id:"r07",name:"Chicken Rice & Vegetables",gf:true,cat:"dinner",servings:4,ings:[{n:"Fresh Chicken Thighs",q:1.5,u:"lbs"},{n:"White Rice",q:1,u:"lb"},{n:"Multi-Colored Peppers",q:0.5,u:"pack"}]},
+  {id:"r08",name:"Ground Beef & Potatoes",gf:true,cat:"dinner",servings:4,ings:[{n:"Ground Beef 85/15",q:1.5,u:"lbs"},{n:"Regular Potatoes",q:2,u:"lbs"},{n:"Red Onions",q:0.25,u:"bag"}]},
+  {id:"r09",name:"Taco Night",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef 85/15",q:1.5,u:"lbs"},{n:"Corn Tortillas GF",q:15,u:"count"},{n:"Shredded Cheese",q:0.5,u:"bag"},{n:"Romaine Lettuce",q:0.5,u:"bag"},{n:"Cherry Tomatoes",q:1,u:"count"}]},
+  {id:"r10",name:"Steak & Vegetables",gf:true,cat:"dinner",servings:2,ings:[{n:"Steak",q:1,u:"lb"},{n:"Asparagus",q:1,u:"bunch"},{n:"Regular Potatoes",q:1,u:"lb"}]},
+  {id:"r11",name:"Chicken Thighs & Broccoli",gf:true,cat:"dinner",servings:4,ings:[{n:"Fresh Chicken Thighs",q:1.5,u:"lbs"},{n:"Broccoli",q:1,u:"head"}]},
+  {id:"r12",name:"Shrimp Stir Fry",gf:true,cat:"dinner",servings:3,ings:[{n:"Shrimp (raw frozen)",q:1,u:"pack"},{n:"Multi-Colored Peppers",q:1,u:"pack"},{n:"Kale",q:0.5,u:"bag"},{n:"Cabbage",q:0.5,u:"lb"}]},
+  {id:"r13",name:"Brisket & Cabbage Bowl",gf:true,cat:"dinner",servings:4,ings:[{n:"Pulled Beef Brisket",q:1,u:"pack"},{n:"Cabbage",q:0.5,u:"lb"},{n:"Multi-Colored Peppers",q:0.5,u:"pack"}]},
+  {id:"r14",name:"Gen Tso's Chicken",gf:true,cat:"dinner",servings:3,ings:[{n:"Gen Tso Chicken GF",q:1,u:"count"}]},
 ];
+const NEW_KITCHEN_RECIPES=[
+  {id:"r15",name:"Baked Cajun Chicken Thighs",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:2,u:"lb"},{n:"Cajun Seasoning",q:2,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r16",name:"BBQ Chicken Thighs",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:2,u:"lb"},{n:"BBQ Sauce",q:0.5,u:"cup"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Smoked Paprika",q:1,u:"tsp"},{n:"Corn on the Cob",q:4,u:"count"}]},
+  {id:"r17",name:"Southwest Chicken Thigh Salad",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"Romaine Lettuce",q:1,u:"head"},{n:"Black Beans",q:1,u:"can"},{n:"Corn",q:1,u:"can"},{n:"Avocado",q:1,u:"count"},{n:"Cherry Tomatoes",q:1,u:"cup"},{n:"Lime",q:1,u:"count"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
+  {id:"r18",name:"Maple Cajun Glazed Salmon",gf:true,cat:"dinner",servings:4,ings:[{n:"Salmon Fillets",q:4,u:"count"},{n:"Raw Maple Syrup",q:2,u:"tbsp"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Lemon",q:1,u:"count"}]},
+  {id:"r19",name:"Steak Bites + Vegetables",gf:true,cat:"dinner",servings:5,ings:[{n:"Sirloin Steak",q:1.5,u:"lb"},{n:"Butter",q:0.25,u:"stick"},{n:"Minced Garlic",q:0.13,u:"jar"},{n:"Rosemary",q:1,u:"tsp"},{n:"Broccoli",q:2,u:"cups"},{n:"Zucchini",q:2,u:"count"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r20",name:"Hamburgers",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:2,u:"lb"},{n:"GF Burger Buns",q:4,u:"count"},{n:"Lettuce",q:1,u:"head"},{n:"Tomato",q:2,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"},{n:"Garlic Powder",q:1,u:"tsp"}]},
+  {id:"r21",name:"Tacos",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:1.5,u:"lb"},{n:"Corn Tortillas",q:8,u:"count"},{n:"Taco Seasoning",q:1,u:"packet"},{n:"Lettuce",q:1,u:"head"},{n:"Tomato",q:2,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Lime",q:1,u:"count"},{n:"Salsa",q:0.5,u:"cup"}]},
+  {id:"r22",name:"Dirty Spaghetti",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Beef",q:1.5,u:"lb"},{n:"GF Spaghetti",q:12,u:"oz"},{n:"Diced Tomatoes",q:1,u:"can"},{n:"Tomato Paste",q:2,u:"tbsp"},{n:"Bell Pepper",q:1,u:"count"},{n:"Onion",q:1,u:"count"},{n:"Minced Garlic",q:0.13,u:"jar"},{n:"Cajun Seasoning",q:1,u:"tbsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
+  {id:"r23",name:"Shrimp Fried Rice",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"White Rice",q:2,u:"cups"},{n:"Eggs",q:3,u:"eggs"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Frozen Peas and Carrots",q:1,u:"cup"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Green Onions",q:3,u:"count"},{n:"Sesame Oil",q:1,u:"tsp"}]},
+  {id:"r24",name:"Chicken Fried Rice",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"White Rice",q:2,u:"cups"},{n:"Eggs",q:3,u:"eggs"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Frozen Peas and Carrots",q:1,u:"cup"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Green Onions",q:3,u:"count"},{n:"Sesame Oil",q:1,u:"tsp"}]},
+  {id:"r25",name:"Mom's Shrimp Ceviche",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"Avocado",q:2,u:"count"},{n:"Lime Juice",q:0.5,u:"cup"},{n:"Tomato",q:2,u:"count"},{n:"Red Onion",q:1,u:"count"},{n:"Cilantro",q:0.5,u:"cup"},{n:"Jalapeño",q:1,u:"count"},{n:"Salt",q:1,u:"to taste"}]},
+  {id:"r26",name:"Garlic Butter Shrimp + Broccoli",gf:true,cat:"dinner",servings:5,ings:[{n:"Raw Shrimp XL",q:0.5,u:"bag"},{n:"Butter",q:0.25,u:"stick"},{n:"Minced Garlic",q:0.17,u:"jar"},{n:"Broccoli",q:3,u:"cups"},{n:"Lemon",q:1,u:"count"},{n:"Red Pepper Flakes",q:0.5,u:"tsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r27",name:"Ground Turkey Lettuce Wraps",gf:true,cat:"dinner",servings:5,ings:[{n:"Ground Turkey",q:1.5,u:"lb"},{n:"Butter Lettuce",q:1,u:"head"},{n:"Coconut Aminos",q:2,u:"tbsp"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Ginger",q:1,u:"tsp"},{n:"Green Onions",q:3,u:"count"},{n:"Water Chestnuts",q:1,u:"can"},{n:"Sesame Oil",q:1,u:"tsp"}]},
+  {id:"r28",name:"Lemon Herb Baked Tilapia",gf:true,cat:"dinner",servings:4,ings:[{n:"Tilapia Fillets",q:1,u:"bag"},{n:"Lemon",q:2,u:"count"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Dried Parsley",q:1,u:"tsp"},{n:"Paprika",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"},{n:"Salt",q:1,u:"to taste"},{n:"Black Pepper",q:1,u:"to taste"}]},
+  {id:"r29",name:"Chicken Thigh Stir Fry",gf:true,cat:"dinner",servings:5,ings:[{n:"Chicken Thighs",q:1.5,u:"lb"},{n:"Bell Pepper",q:2,u:"count"},{n:"Zucchini",q:2,u:"count"},{n:"Broccoli",q:2,u:"cups"},{n:"Coconut Aminos",q:3,u:"tbsp"},{n:"Minced Garlic",q:0.1,u:"jar"},{n:"Ginger",q:1,u:"tsp"},{n:"Sesame Oil",q:1,u:"tsp"},{n:"Olive Oil",q:1,u:"tbsp"}]},
+  {id:"r30",name:"Salmon Patties",gf:true,cat:"dinner",servings:5,ings:[{n:"Canned Salmon",q:2,u:"cans"},{n:"Eggs",q:2,u:"eggs"},{n:"Almond Flour",q:0.25,u:"cup"},{n:"Green Onions",q:3,u:"count"},{n:"Garlic Powder",q:1,u:"tsp"},{n:"Cajun Seasoning",q:1,u:"tsp"},{n:"Olive Oil",q:2,u:"tbsp"}]},
+];
+const DEFAULT_RECIPES=[...OLD_RECIPES,...NEW_KITCHEN_RECIPES];
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
@@ -2591,6 +2608,17 @@ function attachInputEvents(){
 // ══════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════
+// BUGFIX: reseeding must never delete a meal the family already has —
+// only add any of ours that are missing by name, keep everything else.
+function mergeMissingRecipes(existing){
+  const have=new Set(existing.map(r=>r.name.toLowerCase().trim()));
+  const merged=existing.slice();
+  [...OLD_RECIPES,...NEW_KITCHEN_RECIPES].forEach(r=>{
+    const key=r.name.toLowerCase().trim();
+    if(!have.has(key)){merged.push(r);have.add(key);}
+  });
+  return merged;
+}
 function init(){
   let items,recipes,plan,log,fitLog,seedV;
   try{items=JSON.parse(localStorage.getItem("fk-items"));}catch{}
@@ -2601,7 +2629,7 @@ function init(){
   try{seedV=parseInt(localStorage.getItem("fk-seed-v"))||0;}catch{seedV=0;}
   const reseed=seedV<KITCHEN_SEED_VERSION;
   S.items=(items&&items.length>0&&!reseed)?items:DEFAULT_ITEMS;
-  S.recipes=(recipes&&recipes.length>0&&!reseed)?recipes:DEFAULT_RECIPES;
+  S.recipes=(recipes&&recipes.length>0)?(reseed?mergeMissingRecipes(recipes):recipes):DEFAULT_RECIPES;
   S.weekPlan=plan||emptyPlan();
   S.cookLog=log||[];
   S.fit.fitLog=fitLog||[];
