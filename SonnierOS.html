@@ -997,17 +997,6 @@ function finBarChart(weeks,w=280,h=72){
     }).join('')}
   </svg>`;
 }
-function finAllocRow(name,amt,pctStr,barClr,divider){
-  return`<div style="padding:11px 14px;${divider?'border-bottom:1px solid #131D2E':''}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-      <span style="font-size:13px;color:#94A3B8">${esc(name)}</span>
-      <span style="font-size:13px;font-weight:700;color:#F0F4FF">${amt} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pctStr}%</span></span>
-    </div>
-    <div style="height:3px;background:#131D2E;border-radius:2px">
-      <div style="width:${pctStr}%;height:100%;background:${barClr};border-radius:2px;opacity:.7;transition:width .5s ease"></div>
-    </div>
-  </div>`;
-}
 function finBillRow(b,i,total,divider){
   const pctStr=finPct(b.weekly,total);
   return`<div style="padding:11px 14px;${divider?'border-bottom:1px solid #131D2E':''}">
@@ -1021,6 +1010,23 @@ function finBillRow(b,i,total,divider){
     </div>
     <div style="height:3px;background:#131D2E;border-radius:2px">
       <div style="width:${pctStr}%;height:100%;background:#3B82F6;border-radius:2px;opacity:.7;transition:width .5s ease"></div>
+    </div>
+  </div>`;
+}
+const FIN_FUND_COLORS=['#3B82F6','#F59E0B','#10B981','#8B5CF6','#06B6D4','#EC4899'];
+function finFundRow(f,i,total,divider){
+  const pctStr=finPct(f.weekly,total);
+  return`<div style="padding:11px 14px;${divider?'border-bottom:1px solid #131D2E':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+      <span style="font-size:13px;color:#94A3B8">${f.icon||'💰'} ${esc(f.name)}</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;font-weight:700;color:#F0F4FF">${finFmt(f.weekly)} <span style="font-size:10px;color:#3A4D66;font-weight:400">${pctStr}%</span></span>
+        <button data-action="fin-edit-fund" data-idx="${i}" style="color:#3B82F6;font-size:13px;background:none;padding:0 1px;line-height:1">✎</button>
+        <button data-action="fin-del-fund" data-idx="${i}" style="color:#3A4D66;font-size:18px;background:none;padding:0 1px;line-height:1">×</button>
+      </div>
+    </div>
+    <div style="height:3px;background:#131D2E;border-radius:2px">
+      <div style="width:${pctStr}%;height:100%;background:${f.color||'#3B82F6'};border-radius:2px;opacity:.7;transition:width .5s ease"></div>
     </div>
   </div>`;
 }
@@ -1142,9 +1148,13 @@ function financeDash(){
     <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:8px;display:flex;justify-content:space-between">
       <span>MISSION FUNDS</span><span style="color:#4A5D7A">${finFmt(funds)}/wk</span>
     </div>
-    <div class="fin-card" style="overflow:hidden;margin-bottom:14px">
-      ${d.funds.map((f,i)=>finAllocRow(f.icon+' '+f.name,finFmt(f.weekly),finPct(f.weekly,total),f.color,i<d.funds.length-1)).join('')}
+    <div class="fin-card" style="overflow:hidden;margin-bottom:10px">
+      ${d.funds.length===0?`<div style="padding:20px;text-align:center;color:#3A4D66;font-size:12px">No mission funds yet.</div>`:''}
+      ${d.funds.map((f,i)=>finFundRow(f,i,total,i<d.funds.length-1)).join('')}
     </div>
+    <button data-action="fin-open-add-fund" style="width:100%;padding:11px;background:#111B2E;border:1.5px dashed #2A3D55;border-radius:12px;font-size:12px;font-weight:700;color:#4A5D7A;margin-bottom:14px">
+      + Add Mission Fund
+    </button>
 
     <div class="fin-card ${net>=0?'fin-glow-green':''}" style="padding:20px;margin-bottom:14px;text-align:center;border-color:${nc}44">
       <div style="font-size:10px;color:#4A5D7A;font-weight:700;letter-spacing:.1em;margin-bottom:8px">AFTER BILLS & FUNDS</div>
@@ -1479,6 +1489,30 @@ function financeModal(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <button data-action="fin-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
         <button data-action="fin-save-bill" style="padding:14px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;border-radius:12px;font-size:14px;font-weight:700">${v.editIdx!=null?'Update':'Add Bill'}</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='add-fund'){
+    const f=v.data||{};
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">${v.editIdx!=null?'Edit Mission Fund':'Add Mission Fund'}</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:20px">Updates your mission funds total & percentages automatically</div>
+      <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">FUND NAME</label>
+      <input id="fin-f-name" type="text" placeholder="Emergency Fund, Vacation…" value="${esc(f.name||'')}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:12px 14px;font-size:15px;color:#F0F4FF;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">ICON (emoji)</label>
+          <input id="fin-f-icon" type="text" maxlength="2" placeholder="💰" value="${esc(f.icon||'')}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:18px;color:#F0F4FF;text-align:center">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">WEEKLY ($)</label>
+          <input id="fin-f-weekly" type="number" placeholder="50" value="${f.weekly||''}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:18px;font-weight:700;color:#F0F4FF">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="fin-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="fin-save-fund" style="padding:14px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;border-radius:12px;font-size:14px;font-weight:700">${v.editIdx!=null?'Update':'Add Fund'}</button>
       </div>
     </div></div>`;
   }
@@ -2385,6 +2419,7 @@ function handleClick(e){
   if(a==='fin-open-add-goal'){setState({finView:{type:'add-goal',data:{}}});return;}
   if(a==='fin-open-add-account'){setState({finView:{type:'add-account'}});return;}
   if(a==='fin-open-add-bill'){setState({finView:{type:'add-bill',data:{}}});return;}
+  if(a==='fin-open-add-fund'){setState({finView:{type:'add-fund',data:{}}});return;}
   if(a==='fin-log-payment'){setState({finView:{type:'log-payment',idx:parseInt(btn.dataset.idx)}});return;}
   if(a==='fin-update-balance'){setState({finView:{type:'update-balance',idx:parseInt(btn.dataset.idx)}});return;}
   if(a==='fin-link-goal'){setState({finView:{type:'link-goal',goalIdx:parseInt(btn.dataset.idx)}});return;}
@@ -2468,6 +2503,34 @@ function handleClick(e){
   if(a==='fin-del-bill'){
     const idx=parseInt(btn.dataset.idx);const d=loadVF();
     const name=d.bills[idx]?.name;d.bills.splice(idx,1);saveVF(d);showToast(`"${name}" removed`);return;
+  }
+
+  if(a==='fin-edit-fund'){
+    const idx=parseInt(btn.dataset.idx);const d=loadVF();const f=d.funds[idx];
+    setState({finView:{type:'add-fund',editIdx:idx,data:{name:f.name,icon:f.icon,weekly:f.weekly}}});
+    return;
+  }
+
+  if(a==='fin-save-fund'){
+    const name=(document.getElementById('fin-f-name')?.value||'').trim();
+    const icon=(document.getElementById('fin-f-icon')?.value||'').trim()||'💰';
+    const weekly=parseFloat(document.getElementById('fin-f-weekly')?.value)||0;
+    if(!name){showToast('Enter a fund name');return;}
+    if(weekly<=0){showToast('Enter a weekly amount');return;}
+    const d=loadVF();
+    if(S.finView.editIdx!=null){
+      const f=d.funds[S.finView.editIdx];
+      f.name=name;f.icon=icon;f.weekly=weekly;
+    } else {
+      d.funds.push({id:finUid(),name,icon,weekly,color:FIN_FUND_COLORS[d.funds.length%FIN_FUND_COLORS.length]});
+    }
+    const wasEditing=S.finView.editIdx!=null;
+    saveVF(d);setState({finView:null});showToast(`${wasEditing?'Updated':'Added'} — ${finFmt(weekly)}/wk`);return;
+  }
+
+  if(a==='fin-del-fund'){
+    const idx=parseInt(btn.dataset.idx);const d=loadVF();
+    const name=d.funds[idx]?.name;d.funds.splice(idx,1);saveVF(d);showToast(`"${name}" removed`);return;
   }
 
   if(a==='fin-confirm-payment'){
