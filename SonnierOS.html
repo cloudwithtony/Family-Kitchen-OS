@@ -1318,9 +1318,13 @@ function financeHistoryView(){
             <div style="font-size:10px;color:#3A4D66">${finPct(w.net,w.total)}% surplus</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
           ${finMiniStat(finFmt(w.bills),'bills','#4A5D7A')}
           ${finMiniStat(finFmt(w.funds),'funds','#4A5D7A')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button data-action="fin-edit-week" data-key="${w.key}" style="padding:9px;background:#1A2840;border:1px solid #2A3D55;border-radius:9px;font-size:12px;font-weight:600;color:#94A3B8">Edit</button>
+          <button data-action="fin-del-week" data-key="${w.key}" style="padding:9px;background:#1A2840;border:1px solid #2A3D55;border-radius:9px;font-size:12px;font-weight:600;color:#94A3B8">Delete</button>
         </div>
       </div>`;
     }).join('')}
@@ -1513,6 +1517,39 @@ function financeModal(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <button data-action="fin-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
         <button data-action="fin-save-fund" style="padding:14px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;border-radius:12px;font-size:14px;font-weight:700">${v.editIdx!=null?'Update':'Add Fund'}</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='edit-week'){
+    const d=loadVF();const w=d.weeks.find(w=>w.key===v.key);
+    if(!w){return'';}
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">Edit Week</div>
+      <div style="font-size:12px;color:#4A5D7A;margin-bottom:20px">${esc(w.weekLabel)} — fix a mistaken or duplicate entry</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">ANTHON ($)</label>
+          <input id="fin-w-anthon" type="number" value="${w.anthon}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:16px;font-weight:700;color:#F0F4FF">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">LEXI ($)</label>
+          <input id="fin-w-lexi" type="number" value="${w.lexi}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:16px;font-weight:700;color:#F0F4FF">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">BILLS ($)</label>
+          <input id="fin-w-bills" type="number" value="${w.bills}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:16px;font-weight:700;color:#F0F4FF">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:6px">FUNDS ($)</label>
+          <input id="fin-w-funds" type="number" value="${w.funds}" style="width:100%;background:#111B2E;border:1px solid #1E2D45;border-radius:10px;padding:11px 12px;font-size:16px;font-weight:700;color:#F0F4FF">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="fin-close-modal" style="padding:14px;background:#1A2840;color:#94A3B8;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="fin-save-week" style="padding:14px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;border-radius:12px;font-size:14px;font-weight:700">Update</button>
       </div>
     </div></div>`;
   }
@@ -2531,6 +2568,28 @@ function handleClick(e){
   if(a==='fin-del-fund'){
     const idx=parseInt(btn.dataset.idx);const d=loadVF();
     const name=d.funds[idx]?.name;d.funds.splice(idx,1);saveVF(d);showToast(`"${name}" removed`);return;
+  }
+
+  if(a==='fin-edit-week'){setState({finView:{type:'edit-week',key:btn.dataset.key}});return;}
+
+  if(a==='fin-save-week'){
+    const anthon=parseFloat(document.getElementById('fin-w-anthon')?.value)||0;
+    const lexi=parseFloat(document.getElementById('fin-w-lexi')?.value)||0;
+    const bills=parseFloat(document.getElementById('fin-w-bills')?.value)||0;
+    const funds=parseFloat(document.getElementById('fin-w-funds')?.value)||0;
+    const d=loadVF();const w=d.weeks.find(w=>w.key===S.finView.key);
+    if(!w){setState({finView:null});return;}
+    w.anthon=anthon;w.lexi=lexi;w.bills=bills;w.funds=funds;
+    w.total=anthon+lexi;w.net=w.total-bills-funds;
+    saveVF(d);setState({finView:null});showToast(`${w.weekLabel} updated ✓`);return;
+  }
+
+  if(a==='fin-del-week'){
+    const key=btn.dataset.key;const d=loadVF();
+    const idx=d.weeks.findIndex(w=>w.key===key);
+    if(idx<0)return;
+    const label=d.weeks[idx].weekLabel;
+    d.weeks.splice(idx,1);saveVF(d);showToast(`"${label}" removed`);return;
   }
 
   if(a==='fin-confirm-payment'){
