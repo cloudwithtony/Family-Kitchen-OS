@@ -917,10 +917,13 @@ function missionsModal(){
 
   if(v.type==='allocate'){
     const income=fin.income||0;
-    const defaultPcts={sec:50,wlth:15,biz:15,car:10,exp:10};
+    const defaultPcts=fin.pcts||{sec:50,wlth:15,biz:15,car:10,exp:10};
     return`<div ${OV}><div ${SH}>
       <div style="font-size:18px;font-weight:800;color:#EEF2FF;margin-bottom:3px">💰 Allocate Paycheck</div>
-      <div style="font-size:12px;color:#7B8FAE;margin-bottom:16px">Assign this paycheck to your five missions</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:12px;color:#7B8FAE">Assign this paycheck to your five missions</div>
+        <button data-action="open-edit-pcts" style="font-size:11px;color:#3B82F6;background:none;font-weight:700;flex-shrink:0;padding:2px 0 2px 8px">✎ Edit Split</button>
+      </div>
       <input id="alloc-amt" type="number" placeholder="Paycheck amount" value="${income||''}" style="width:100%;background:#131E30;border:1px solid #1C2D45;border-radius:10px;padding:13px 14px;font-size:18px;font-weight:700;color:#EEF2FF;margin-bottom:14px">
       ${M.map(m=>{
         const pct=defaultPcts[m.id]||10;
@@ -933,6 +936,28 @@ function missionsModal(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
         <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
         <button data-action="confirm-allocate" style="padding:13px;background:#2563EB;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Allocate ✓</button>
+      </div>
+    </div></div>`;
+  }
+
+  if(v.type==='edit-pcts'){
+    const pcts=fin.pcts||{sec:50,wlth:15,biz:15,car:10,exp:10};
+    const totalPct=M.reduce((s,m)=>s+(pcts[m.id]??10),0);
+    return`<div ${OV}><div ${SH}>
+      <div style="font-size:18px;font-weight:800;color:#EEF2FF;margin-bottom:3px">⚙️ Adjust Paycheck Split</div>
+      <div style="font-size:12px;color:#7B8FAE;margin-bottom:16px">Set what % of each paycheck goes to each mission</div>
+      ${M.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1C2D45">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:17px">${m.icon}</span>
+        <span style="font-size:13px;color:#EEF2FF;font-weight:600">${m.name}</span></div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input id="pct-${m.id}" type="number" min="0" max="100" value="${pcts[m.id]??10}" style="width:56px;background:#131E30;border:1px solid #1C2D45;border-radius:8px;padding:8px;font-size:14px;color:#EEF2FF;text-align:right">
+          <span style="font-size:13px;color:#7B8FAE">%</span>
+        </div>
+      </div>`).join('')}
+      <div style="font-size:11px;color:${totalPct===100?'#3A4D66':'#D97706'};margin-top:10px">Total: ${totalPct}%${totalPct===100?'':' — does not need to equal 100%, but most people aim for it'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+        <button data-action="close-modal" style="padding:13px;background:#1C2D45;color:#7B8FAE;border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
+        <button data-action="save-pcts" style="padding:13px;background:#2563EB;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Save Split ✓</button>
       </div>
     </div></div>`;
   }
@@ -2393,6 +2418,15 @@ function handleClick(e){
   if(a==='close-modal'){setState({view:null});return;}
   if(a==='open-allocate'){setState({view:{type:'allocate',data:{}}});return;}
   if(a==='open-log'){setState({view:{type:'log',data:{}}});return;}
+  if(a==='open-edit-pcts'){setState({view:{type:'edit-pcts',data:{}}});return;}
+  if(a==='save-pcts'){
+    const pcts={};
+    M.forEach(m=>{pcts[m.id]=parseFloat(document.getElementById('pct-'+m.id)?.value)||0;});
+    const fin=loadFinancial();fin.pcts=pcts;saveFinancial(fin);
+    S.view=null;
+    showToast('Paycheck split updated');
+    return;
+  }
   if(a==='sel-mission'){setState({view:{type:'log',data:{mid:btn.dataset.mid}}});return;}
   if(a==='toggle'){
     const mid=btn.dataset.mid;
@@ -2424,8 +2458,8 @@ function handleClick(e){
   if(a==='confirm-allocate'){
     const amt=parseFloat(document.getElementById('alloc-amt')?.value)||0;
     if(amt<=0){showToast('Enter an amount first');return;}
-    const pcts={sec:50,wlth:15,biz:15,car:10,exp:10};
     const fin=loadFinancial();
+    const pcts=fin.pcts||{sec:50,wlth:15,biz:15,car:10,exp:10};
     if(!fin.buckets)fin.buckets={};
     if(!fin.transactions)fin.transactions=[];
     M.forEach(m=>{
