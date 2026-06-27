@@ -2056,7 +2056,11 @@ function kitchenMealsTab(){
               <div style="font-weight:700;font-size:15px;color:#fff">${esc(r.name)}</div>
               <div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:2px">${r.gf?"<span style='background:rgba(255,255,255,.2);padding:1px 6px;border-radius:10px;margin-right:5px;font-weight:700'>GF ✓</span>":""}${r.servings} servings</div>
             </div>
-            ${allGood?"<span style='font-size:22px'>✅</span>":""}
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              ${allGood?"<span style='font-size:22px'>✅</span>":""}
+              <button data-action="open-edit-meal" data-rid="${r.id}" style="width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.25);color:rgba(255,255,255,.9);font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1">✎</button>
+              <button data-action="del-recipe" data-rid="${r.id}" style="width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.25);color:rgba(255,255,255,.9);font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
+            </div>
           </div>
           <div style="padding:10px 16px">
             ${ings.map(i=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:${i.ok?"#4ADE80":"#F87171"};border-bottom:1px solid var(--border)">
@@ -2281,13 +2285,14 @@ function addItemModal(){
 
 function addMealModal(){
   const f=S.addMeal;
+  const isEdit=f.editId!=null;
   const catColor={breakfast:"#7C3AED",lunch:"#2563EB",dinner:"#DC2626"};
   const inp="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;width:100%;outline:none";
   const lbl="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px;letter-spacing:.05em";
   const itemNames=S.items.map(i=>i.name);
   return`<div data-action="close-add-meal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
     <div data-action="noop" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
-      <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">🍽️ Add New Meal</div>
+      <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">${isEdit?'✎ Edit Meal':'🍽️ Add New Meal'}</div>
       <div style="margin-bottom:10px"><div style="${lbl}">MEAL NAME *</div>
         <input id="am-name" type="text" placeholder="e.g. Chicken Stir Fry" value="${esc(f.name)}" style="${inp}"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
@@ -2318,7 +2323,7 @@ function addMealModal(){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
         <button data-action="close-add-meal" style="padding:13px;background:var(--card2);color:var(--t1);border-radius:12px;font-size:14px;font-weight:700">Cancel</button>
-        <button data-action="save-meal" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">Save Meal ✓</button>
+        <button data-action="save-meal" style="padding:13px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:700">${isEdit?'Update Meal ✓':'Save Meal ✓'}</button>
       </div>
     </div>
   </div>`;
@@ -2801,6 +2806,20 @@ function handleClick(e){
     setState({addMeal:{name:"",cat:"dinner",servings:4,gf:true,ings:[]}});
     return;
   }
+  if(a==='open-edit-meal'){
+    const r=S.recipes.find(r=>r.id===btn.dataset.rid);
+    if(!r)return;
+    setState({addMeal:{editId:r.id,name:r.name,cat:r.cat,servings:r.servings,gf:!!r.gf,ings:r.ings.map(i=>({...i}))}});
+    return;
+  }
+  if(a==='del-recipe'){
+    const rid=btn.dataset.rid;const r=S.recipes.find(r=>r.id===rid);
+    const updated=S.recipes.filter(r=>r.id!==rid);
+    setState({recipes:updated});
+    saveRecipes();
+    showToast(`"${r?.name}" removed from meals`);
+    return;
+  }
   if(a==='close-add-meal'){setState({addMeal:null});return;}
   if(a==='am-cat'){syncAddMealFromDOM();S.addMeal.cat=btn.dataset.cat;render();return;}
   if(a==='am-gf'){syncAddMealFromDOM();S.addMeal.gf=!S.addMeal.gf;render();return;}
@@ -2829,6 +2848,13 @@ function handleClick(e){
     const f=S.addMeal;
     if(!f.name.trim()){showToast("⚠️ Meal name is required");return;}
     if(!f.ings.length){showToast("⚠️ Add at least one ingredient");return;}
+    if(f.editId!=null){
+      const updated=S.recipes.map(r=>r.id===f.editId?{...r,name:f.name.trim(),gf:f.gf,cat:f.cat,servings:parseInt(f.servings)||1,ings:f.ings}:r);
+      setState({recipes:updated,addMeal:null,mealTab:f.cat});
+      saveRecipes();
+      showToast("✎ "+f.name.trim()+" updated!");
+      return;
+    }
     const newId="r"+Date.now().toString(36);
     const newRecipe={id:newId,name:f.name.trim(),gf:f.gf,cat:f.cat,servings:parseInt(f.servings)||1,ings:f.ings};
     const updated=[...S.recipes,newRecipe];
