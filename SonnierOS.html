@@ -83,6 +83,24 @@ const STRENGTH_EXERCISES=[
   {id:'pullups',name:'Pull-Ups',icon:'🏋️'},
   {id:'situps',name:'Sit-Ups',icon:'🔥'},
 ];
+const CALISTHENICS_EXERCISES=[
+  {id:'pushups',  name:'Push-Ups',         icon:'💪',  target:12,unit:'reps'},
+  {id:'squats',   name:'Squats',           icon:'🦵',  target:15,unit:'reps'},
+  {id:'plank',    name:'Plank',            icon:'⏱️',  target:30,unit:'sec'},
+  {id:'lunges',   name:'Lunges',           icon:'🚶',  target:12,unit:'reps'},
+  {id:'pullups',  name:'Pull-Ups',         icon:'🏋️',  target:6, unit:'reps'},
+  {id:'situps',   name:'Sit-Ups',          icon:'🔥',  target:15,unit:'reps'},
+  {id:'burpees',  name:'Burpees',          icon:'🔄',  target:10,unit:'reps'},
+  {id:'mtnclimb', name:'Mountain Climbers',icon:'⛰️',  target:30,unit:'sec'},
+  {id:'jjacks',   name:'Jumping Jacks',    icon:'⭐',  target:20,unit:'reps'},
+  {id:'wallsit',  name:'Wall Sit',         icon:'🧱',  target:45,unit:'sec'},
+  {id:'gbridge',  name:'Glute Bridges',    icon:'🌉',  target:15,unit:'reps'},
+  {id:'tdips',    name:'Tricep Dips',      icon:'💺',  target:12,unit:'reps'},
+  {id:'hknees',   name:'High Knees',       icon:'🏃',  target:30,unit:'sec'},
+  {id:'splank',   name:'Side Plank',       icon:'🤸',  target:20,unit:'sec'},
+  {id:'superman', name:'Superman',         icon:'🦸',  target:12,unit:'reps'},
+  {id:'bcrunch',  name:'Bicycle Crunches', icon:'🚴',  target:20,unit:'reps'},
+];
 const RUN_LAP_MILES=0.25;
 const RUN_TARGET_LAPS=9;
 
@@ -243,7 +261,7 @@ let S={
   finTab:'dash',finView:null,finRefreshing:false,finLastRefresh:null,
   // fitness
   fTab:'yoga',
-  fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[]},
+  fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[],randomEx:null},
   // running club
   rcTab:'week',rcView:null,
   // kitchen
@@ -629,6 +647,22 @@ function runLog(){
   saveFit();
   S.fit.runLaps=0;S.fit.runStart=null;
   showToast('🏃 Run logged — '+miles+' mi');
+}
+
+// ── random exercise dice ──
+function rollDice(){
+  const pool=CALISTHENICS_EXERCISES.filter(e=>e.id!==S.fit.randomEx);
+  const choices=pool.length?pool:CALISTHENICS_EXERCISES;
+  S.fit.randomEx=choices[Math.floor(Math.random()*choices.length)].id;
+  render();
+}
+function logRandomExercise(){
+  const ex=CALISTHENICS_EXERCISES.find(e=>e.id===S.fit.randomEx);
+  if(!ex)return;
+  S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'random',date:now(),exId:ex.id,exName:ex.name,icon:ex.icon},...S.fit.fitLog];
+  saveFit();
+  S.fit.randomEx=null;
+  showToast(`${ex.icon} ${ex.name} logged!`);
 }
 
 // ── running club ──
@@ -1613,13 +1647,14 @@ function fitnessTab(){
       ${S.fTab==='yoga'?fitnessYoga():''}
       ${S.fTab==='strength'?fitnessStrength():''}
       ${S.fTab==='run'?fitnessRun():''}
+      ${S.fTab==='random'?fitnessRandom():''}
       ${S.fTab==='club'?fitnessClub():''}
     </div>
   `;
 }
 
 function fitnessSubNav(){
-  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
+  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
   return`<div style="display:flex;gap:6px;padding:10px 16px 4px;flex-shrink:0">
     ${tabs.map(t=>`<button data-action="f-tab" data-ftab="${t.id}" style="flex:1;padding:9px 4px;background:${S.fTab===t.id?'#16A34A':'var(--card)'};color:${S.fTab===t.id?'#fff':'var(--t2)'};border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${S.fTab===t.id?'#16A34A':'var(--border)'}">${t.icon} ${t.label}</button>`).join('')}
   </div>`;
@@ -1723,6 +1758,32 @@ function fitnessRun(){
     ${recent.map(l=>`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px;text-align:left">
       <span style="font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()}</span>
       <span style="font-size:12px;color:#EEF2FF;font-weight:700">${l.miles} mi · ${l.laps} laps${l.durationMin?' · '+l.durationMin+' min':''}</span>
+    </div>`).join('')}`:''}
+  </div>`;
+}
+
+function fitnessRandom(){
+  const recent=S.fit.fitLog.filter(l=>l.type==='random').slice(0,5);
+  const ex=S.fit.randomEx?CALISTHENICS_EXERCISES.find(e=>e.id===S.fit.randomEx):null;
+  return`<div class="scroll fade" style="padding-top:14px">
+    ${!ex?`<div style="text-align:center;padding:30px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border);margin-bottom:16px">
+      <div style="font-size:48px;margin-bottom:14px">🎲</div>
+      <div style="font-size:16px;font-weight:800;color:#EEF2FF;margin-bottom:6px">Exercise Roulette</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:18px;line-height:1.5">Can't decide what to do? Roll for a random bodyweight exercise — no equipment needed.</div>
+      <button data-action="roll-dice" style="width:100%;padding:16px;background:#16A34A;color:#fff;border-radius:14px;font-size:16px;font-weight:800;box-shadow:0 6px 20px #16A34A55">🎲 Roll the Dice</button>
+    </div>`:`<div class="pop" style="text-align:center;padding:30px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border);margin-bottom:16px">
+      <div style="font-size:52px;margin-bottom:10px">${ex.icon}</div>
+      <div style="font-size:20px;font-weight:800;color:#EEF2FF;margin-bottom:6px">${esc(ex.name)}</div>
+      <div style="font-size:15px;font-weight:700;color:#4ADE80;margin-bottom:18px">${ex.target} ${ex.unit}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button data-action="roll-dice" style="padding:14px;background:var(--card2);color:var(--t1);border-radius:12px;font-size:14px;font-weight:700;border:1px solid var(--border)">🎲 Reroll</button>
+        <button data-action="random-done" style="padding:14px;background:#16A34A;color:#fff;border-radius:12px;font-size:14px;font-weight:800">✓ Done</button>
+      </div>
+    </div>`}
+    ${recent.length>0?`<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">RECENT ROLLS</div>
+    ${recent.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
+      <span style="font-size:12px;color:var(--t2)">${l.icon||''} ${esc(l.exName)}</span>
+      <span style="font-size:11px;color:var(--t2)">${new Date(l.date).toLocaleDateString()}</span>
     </div>`).join('')}`:''}
   </div>`;
 }
@@ -2714,6 +2775,8 @@ function handleClick(e){
   if(a==='run-lap'){runLap();return;}
   if(a==='run-reset'){runReset();return;}
   if(a==='run-log'){runLog();render();return;}
+  if(a==='roll-dice'){rollDice();return;}
+  if(a==='random-done'){logRandomExercise();return;}
   // ── running club ──
   if(a==='rc-tab'){setState({rcTab:btn.dataset.rctab});return;}
   if(a==='rc-open-log'){rcOpenLogModal();return;}
