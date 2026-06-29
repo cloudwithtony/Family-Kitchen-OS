@@ -289,7 +289,7 @@ let S={
   finTab:'dash',finView:null,finRefreshing:false,finLastRefresh:null,
   // fitness
   fTab:'yoga',
-  fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[],randomEx:null,
+  fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},strProfile:'dad',runLaps:0,runStart:null,fitLog:[],randomEx:null,
     spIdx:0,spSecLeft:0,spRunning:false,spActive:false,spProfile:'dad'},
   // leveling (Brain/Body/Wealth/Spiritual XP, per profile)
   levels:null,lvProfile:'dad',
@@ -788,13 +788,23 @@ function finishStrengthWorkout(){
   const totalSets=STRENGTH_EXERCISES.reduce((s,ex)=>s+S.fit.strength[ex.id].filter(st=>st.done).length,0);
   if(totalSets===0){showToast('Log at least one set first');return;}
   const detail=STRENGTH_EXERCISES.map(ex=>({ex:ex.id,sets:S.fit.strength[ex.id].filter(st=>st.done).map(st=>st.reps)})).filter(d=>d.sets.length);
-  S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'strength',date:now(),sets:totalSets,detail},...S.fit.fitLog];
+  const profile=S.fit.strProfile||'dad';
+  S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'strength',date:now(),profile,sets:totalSets,detail},...S.fit.fitLog];
   saveFit();
-  awardXp('dad',['body'],totalSets*3);
+  awardXp(profile,['body'],totalSets*3);
   const brainSets=detail.filter(d=>(EX_TRACKS[d.ex]||[]).includes('brain')).reduce((s,d)=>s+d.sets.length,0);
-  if(brainSets>0)awardXp('dad',['brain'],brainSets*3);
+  if(brainSets>0)awardXp(profile,['brain'],brainSets*3);
   S.fit.strength={};
   showToast('💪 Workout logged — '+totalSets+' sets');
+}
+
+// ── bjj ──
+function logBJJClass(){
+  S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'bjj',date:now()},...S.fit.fitLog];
+  saveFit();
+  awardXp('noah',['body','brain'],15);
+  awardXp('zayden',['body','brain'],15);
+  showToast('🥋 BJJ class logged — Noah & Zayden +15 XP');
 }
 
 // ── run ──
@@ -1831,13 +1841,14 @@ function fitnessTab(){
       ${S.fTab==='run'?fitnessRun():''}
       ${S.fTab==='random'?fitnessRandom():''}
       ${S.fTab==='spirit'?fitnessSpiritual():''}
+      ${S.fTab==='bjj'?fitnessBJJ():''}
       ${S.fTab==='club'?fitnessClub():''}
     </div>
   `;
 }
 
 function fitnessSubNav(){
-  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'},{id:'spirit',icon:'🕊️',label:'Spirit'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
+  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'},{id:'spirit',icon:'🕊️',label:'Spirit'},{id:'bjj',icon:'🥋',label:'BJJ'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
   return`<div style="display:flex;gap:6px;padding:10px 16px 4px;flex-shrink:0">
     ${tabs.map(t=>`<button data-action="f-tab" data-ftab="${t.id}" style="flex:1;padding:9px 4px;background:${S.fTab===t.id?'#16A34A':'var(--card)'};color:${S.fTab===t.id?'#fff':'var(--t2)'};border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${S.fTab===t.id?'#16A34A':'var(--border)'}">${t.icon} ${t.label}</button>`).join('')}
   </div>`;
@@ -1939,11 +1950,35 @@ function fitnessSpiritual(){
     </div>`).join('')}`:''}
   </div>`;
 }
+function fitnessBJJ(){
+  const recent=S.fit.fitLog.filter(l=>l.type==='bjj').slice(0,5);
+  return`<div class="scroll fade" style="padding-top:14px">
+    <div style="text-align:center;padding:20px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border);margin-bottom:16px">
+      <div style="font-size:40px;margin-bottom:10px">🥋</div>
+      <div style="font-size:16px;font-weight:800;color:#EEF2FF;margin-bottom:6px">Brazilian Jiu-Jitsu</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.5">Mon · Wed · Fri — tap after class to log it for Noah & Zayden</div>
+      <button data-action="bjj-log" style="width:100%;padding:14px;background:#7C3AED;color:#fff;border-radius:14px;font-size:15px;font-weight:800;box-shadow:0 6px 20px #7C3AED55">🥋 Log Class</button>
+    </div>
+    ${recent.length>0?`<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">RECENT CLASSES</div>
+    ${recent.map(l=>`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
+      <span style="font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()}</span>
+      <span style="font-size:12px;color:#EEF2FF;font-weight:700">Noah & Zayden +15 XP</span>
+    </div>`).join('')}`:''}
+  </div>`;
+}
 function fitnessStrength(){
   ensureStrengthState();
   const recent=S.fit.fitLog.filter(l=>l.type==='strength').slice(0,5);
   const totalDone=STRENGTH_EXERCISES.reduce((s,ex)=>s+S.fit.strength[ex.id].filter(st=>st.done).length,0);
+  const profile=S.fit.strProfile||'dad';
   return`<div class="scroll fade" style="padding-top:14px">
+    <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:8px">WHO'S LIFTING?</label>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:16px">
+      ${LEVEL_PROFILES.map(pp=>`<button data-action="strength-pick-profile" data-profile="${pp.id}" style="padding:10px 4px;background:${profile===pp.id?'#16A34A':'#111B2E'};border:1px solid ${profile===pp.id?'#16A34A':'#1E2D45'};border-radius:12px;text-align:center">
+        <div style="font-size:20px">${pp.icon}</div>
+        <div style="font-size:11px;font-weight:700;color:${profile===pp.id?'#fff':'#94A3B8'};margin-top:2px">${pp.name}</div>
+      </button>`).join('')}
+    </div>
     <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">3 SETS EACH — TAP ✓ TO LOG A SET</div>
     ${STRENGTH_EXERCISES.map(ex=>`<div style="background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:9px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -1966,7 +2001,7 @@ function fitnessStrength(){
     <button data-action="strength-finish" style="width:100%;padding:14px;background:${totalDone>0?'#16A34A':'#1C2D45'};color:${totalDone>0?'#fff':'var(--t2)'};border-radius:14px;font-size:14px;font-weight:800;margin-top:6px">🏁 Finish Workout${totalDone>0?' — '+totalDone+' sets':''}</button>
     ${recent.length>0?`<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin:16px 0 10px">RECENT WORKOUTS</div>
     ${recent.map(l=>`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
-      <span style="font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()}</span>
+      <span style="font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()} · ${esc(LEVEL_PROFILES.find(p=>p.id===l.profile)?.name||'Dad')}</span>
       <span style="font-size:12px;color:#EEF2FF;font-weight:700">${l.sets} sets</span>
     </div>`).join('')}`:''}
   </div>`;
@@ -2657,7 +2692,7 @@ function historyTab(){
   const rows=last14();
   const st=streak();
   const fitRecent=S.fit.fitLog.slice(0,8);
-  const fitIcon={yoga:'🧘',strength:'💪',run:'🏃'};
+  const fitIcon={yoga:'🧘',strength:'💪',run:'🏃',spiritual:'🕊️',bjj:'🥋'};
 
   return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
       <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">📊 History</div>
@@ -2686,6 +2721,8 @@ function historyTab(){
           if(l.type==='yoga')detail=l.poses+' poses · '+Math.round(l.sec/60)+' min';
           else if(l.type==='strength')detail=l.sets+' sets';
           else if(l.type==='run')detail=l.miles+' mi · '+l.laps+' laps';
+          else if(l.type==='spiritual')detail=l.steps+' steps · '+Math.round(l.sec/60)+' min';
+          else if(l.type==='bjj')detail='Noah & Zayden +15 XP';
           return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
             <span style="font-size:16px">${fitIcon[l.type]||'🏃'}</span>
             <span style="flex:1;font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()}</span>
@@ -2744,8 +2781,9 @@ function levelsTab(){
         <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:6px">HOW XP IS EARNED</div>
         <div style="font-size:11px;color:var(--t2);line-height:1.7">
           🛡️ Security & 🏗️ Wealth missions → Wealth · ⚡ Business → Wealth + Brain · 🎯 Career & 🌱 Family → Brain<br>
-          🧘 Yoga → Brain + Body · 💪 Strength & 🎲 Dice → Body (+ Brain for Plank / Wall Sit / Side Plank) · 🏃 Run → Body<br>
+          🧘 Yoga → Brain + Body · 💪 Strength & 🎲 Dice → Body (+ Brain for Plank / Wall Sit / Side Plank), pick who's lifting · 🏃 Run → Body<br>
           🕊️ Meditation & Mantra → Spiritual (Dad, Noah or Zayden) · 🏃 Running Club → Body for whoever logged the run<br>
+          🥋 BJJ class (Mon/Wed/Fri) → Body + Brain for both Noah & Zayden automatically<br>
           📅 Logging a finance week scores Dad's whole week (finance + missions + fitness) for bonus XP across Wealth/Brain/Body.
         </div>
       </div>
@@ -3079,6 +3117,7 @@ function handleClick(e){
   if(a==='strength-dec'){adjustStrengthSet(btn.dataset.ex,parseInt(btn.dataset.set),-1);return;}
   if(a==='strength-log-set'){logStrengthSet(btn.dataset.ex,parseInt(btn.dataset.set));return;}
   if(a==='strength-finish'){finishStrengthWorkout();render();return;}
+  if(a==='strength-pick-profile'){S.fit.strProfile=btn.dataset.profile;render();return;}
   if(a==='run-lap'){runLap();return;}
   if(a==='run-reset'){runReset();return;}
   if(a==='run-log'){runLog();render();return;}
@@ -3090,6 +3129,7 @@ function handleClick(e){
   if(a==='spirit-resume'){resumeSpirit();return;}
   if(a==='spirit-skip'){skipSpiritStep();return;}
   if(a==='spirit-stop'){stopSpirit();return;}
+  if(a==='bjj-log'){logBJJClass();render();return;}
   // ── running club ──
   if(a==='rc-tab'){setState({rcTab:btn.dataset.rctab});return;}
   if(a==='rc-open-log'){rcOpenLogModal();return;}
