@@ -298,7 +298,7 @@ let S={
   // kitchen
   items:[],recipes:[],kTab:'home',pantrySearch:"",pantryLoc:"all",
   mealTab:"breakfast",mealsView:"recipes",cooking:null,undoMeal:null,
-  shopBought:{},addItem:null,addMeal:null,weekPlan:null,cookLog:[],
+  shopBought:{},shopQty:{},addItem:null,addMeal:null,weekPlan:null,cookLog:[],
 };
 let toastTimer=null;
 let yogaInterval=null;
@@ -2479,14 +2479,12 @@ function kitchenPlanTab(){
   </div>`;
 }
 // ── KITCHEN SHOP ──
-function kitchenShopTab(){
+function buildShopList(){
   const needed={};
-  let hasPlan=false;
   PLAN_DAYS.forEach(d=>{
     ["breakfast","lunch","dinner"].forEach(m=>{
       const rid=S.weekPlan[d][m];
       if(!rid)return;
-      hasPlan=true;
       const recipe=S.recipes.find(r=>r.id===rid);
       if(!recipe)return;
       const mult=FAMILY_SIZE/(recipe.servings||1);
@@ -2502,6 +2500,36 @@ function kitchenShopTab(){
       });
     });
   });
+  return Object.values(needed).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function shopDone(){
+  const list=buildShopList();
+  const boughtNames=Object.keys(S.shopBought).filter(n=>S.shopBought[n]);
+  if(!boughtNames.length){showToast('Check off items you bought first');return;}
+  let items=[...S.items];
+  boughtNames.forEach(name=>{
+    const shopItem=list.find(i=>i.name.toLowerCase()===name.toLowerCase());
+    const qty=parseFloat((S.shopQty[name]??shopItem?.need??1).toFixed(2));
+    const unit=shopItem?.unit||'count';
+    const existing=resolveItem(name);
+    if(existing){
+      items=items.map(i=>i.id===existing.id?{...i,qty:parseFloat((i.qty+qty).toFixed(2)),addedDate:now()}:i);
+    } else {
+      items=[...items,mkItem('u'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),name,qty,unit,'fridge','other',7)];
+    }
+    upsertPantryHistory({name,qty,unit,loc:existing?.loc||'fridge',cat:existing?.cat||'other',expDays:existing?.expDays||7,price:existing?.price||0,low:existing?.low||0});
+  });
+  S.items=items;
+  const nb={};
+  Object.keys(S.shopBought).forEach(n=>{if(!S.shopBought[n])nb[n]=false;});
+  S.shopBought=nb;
+  S.shopQty={};
+  saveItems();
+  showToast('✅ '+boughtNames.length+' item'+(boughtNames.length>1?'s':'')+' added to pantry');
+}
+function kitchenShopTab(){
+  const list=buildShopList();
+  const hasPlan=PLAN_DAYS.some(d=>["breakfast","lunch","dinner"].some(m=>S.weekPlan[d][m]));
   if(!hasPlan)return`<div class="scroll fade" style="padding-top:8px">
     <div style="text-align:center;padding:60px 16px">
       <div style="font-size:48px;margin-bottom:12px">📅</div>
@@ -2510,28 +2538,39 @@ function kitchenShopTab(){
       <button data-action="k-tab" data-ktab="plan" style="padding:12px 24px;background:#0D9488;color:#fff;border-radius:12px;font-size:14px;font-weight:700">📅 Go to Planner</button>
     </div>
   </div>`;
-  const list=Object.values(needed).sort((a,b)=>a.name.localeCompare(b.name));
+  const checkedCount=Object.values(S.shopBought).filter(Boolean).length;
+  const allChecked=list.length>0&&list.every(i=>S.shopBought[i.name]);
   const hasPrices=list.some(i=>i.price>0&&!S.shopBought[i.name]);
   const total=list.filter(i=>!S.shopBought[i.name]&&i.price>0).reduce((s,i)=>s+i.price,0);
   const catIcon={Proteins:"🥩",Produce:"🥦",Frozen:"🧊",["Pantry Staples"]:"🥫"};
   function itemRow(i){
     const bought=S.shopBought[i.name];
-    return`<div data-action="toggle-bought" data-item="${esc(i.name)}" style="background:${bought?"#0F2A1A":"var(--card)"};border-radius:12px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;border:1px solid ${bought?"#166534":"var(--border)"};opacity:${bought?.6:1}">
-      <div style="width:24px;height:24px;border-radius:6px;border:2px solid ${bought?"#22C55E":"var(--border)"};background:${bought?"#22C55E":"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        ${bought?"<span style='color:#fff;font-size:14px;font-weight:700'>✓</span>":""}
+    const qty=S.shopQty[i.name]??i.need;
+    return`<div style="background:${bought?"#0C2318":"var(--card)"};border-radius:12px;padding:11px 12px;margin-bottom:7px;display:flex;align-items:center;gap:10px;border:1px solid ${bought?"#166534":"var(--border)"}">
+      <button data-action="toggle-bought" data-item="${esc(i.name)}" style="width:26px;height:26px;border-radius:7px;border:2px solid ${bought?"#22C55E":"var(--border)"};background:${bought?"#22C55E":"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${bought?"<span style='color:#fff;font-size:13px;font-weight:800'>✓</span>":""}
+      </button>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;color:${bought?"#6EE7A0":"#E8EEF8"};text-decoration:${bought?"line-through":"none"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div>
+        <div style="font-size:10px;color:var(--t3)">recipe needs ${i.need} ${esc(i.unit)}</div>
       </div>
-      <div style="flex:1">
-        <div style="font-weight:600;font-size:13px;color:#E8EEF8;text-decoration:${bought?"line-through":"none"}">${esc(i.name)}</div>
-        <div style="font-size:11px;color:var(--t2)">Need ${i.need} ${esc(i.unit)}</div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        <button data-action="shop-qty-dec" data-item="${esc(i.name)}" data-need="${i.need}" style="width:26px;height:26px;border-radius:6px;background:#1C2D45;color:#EEF2FF;font-size:16px;font-weight:700;line-height:1">−</button>
+        <span style="font-size:13px;font-weight:800;color:#EEF2FF;min-width:32px;text-align:center">${qty} <span style="font-size:10px;font-weight:500;color:var(--t2)">${esc(i.unit)}</span></span>
+        <button data-action="shop-qty-inc" data-item="${esc(i.name)}" data-need="${i.need}" style="width:26px;height:26px;border-radius:6px;background:#1C2D45;color:#EEF2FF;font-size:16px;font-weight:700;line-height:1">+</button>
       </div>
-      ${i.price>0?`<div style="font-weight:700;color:#22C55E;font-size:14px">$${i.price.toFixed(2)}</div>`:""}
     </div>`;
   }
   return`<div class="scroll fade" style="padding-top:8px">
-    <div style="background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
-      <div><div style="font-size:10px;color:var(--t2);margin-bottom:2px">ITEMS TO BUY</div><div style="font-size:26px;font-weight:800;color:#3B82F6">${list.length}</div></div>
-      ${hasPrices?`<div style="text-align:right"><div style="font-size:10px;color:var(--t2);margin-bottom:2px">EST. COST</div><div style="font-size:26px;font-weight:800;color:#22C55E">$${total.toFixed(2)}</div></div>`:""}
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1;background:var(--card);border-radius:12px;padding:12px 14px">
+        <div style="font-size:10px;color:var(--t2);margin-bottom:2px">TO BUY</div>
+        <div style="font-size:24px;font-weight:800;color:#3B82F6">${list.length-checkedCount} <span style="font-size:12px;font-weight:500;color:var(--t2)">of ${list.length}</span></div>
+      </div>
+      ${hasPrices?`<div style="flex:1;background:var(--card);border-radius:12px;padding:12px 14px;text-align:right"><div style="font-size:10px;color:var(--t2);margin-bottom:2px">EST. LEFT</div><div style="font-size:24px;font-weight:800;color:#22C55E">$${total.toFixed(2)}</div></div>`:''}
+      <button data-action="shop-check-all" style="padding:12px 14px;background:var(--card);border-radius:12px;font-size:12px;font-weight:700;color:${allChecked?"#EF4444":"#3B82F6"};border:1px solid var(--border)">${allChecked?"Uncheck All":"Check All"}</button>
     </div>
+    ${checkedCount>0?`<button data-action="shop-done" style="width:100%;padding:14px;background:#16A34A;color:#fff;border-radius:14px;font-size:15px;font-weight:800;margin-bottom:14px;box-shadow:0 4px 20px #16A34A44">✅ Done Shopping — add ${checkedCount} item${checkedCount>1?'s':''} to pantry</button>`:''}
     ${list.length===0?`<div style="text-align:center;padding:40px 0;color:var(--t2)">🎉 You have everything for this week!</div>`:
       SHOP_CAT_ORDER.map(secCat=>{
         const items=list.filter(i=>i.cat===secCat);
@@ -3213,10 +3252,39 @@ function handleClick(e){
   }
   if(a==='toggle-bought'){
     const name=btn.dataset.item;
-    const nb={...S.shopBought,[name]:!S.shopBought[name]};
-    setState({shopBought:nb});
-    return;
+    const nowBuying=!S.shopBought[name];
+    if(nowBuying&&S.shopQty[name]==null){
+      const list=buildShopList();
+      const si=list.find(i=>i.name.toLowerCase()===name.toLowerCase());
+      if(si)S.shopQty[name]=si.need;
+    }
+    S.shopBought={...S.shopBought,[name]:nowBuying};
+    render();return;
   }
+  if(a==='shop-qty-inc'){
+    const name=btn.dataset.item;
+    const cur=(S.shopQty[name]??parseFloat(btn.dataset.need))||1;
+    S.shopQty[name]=parseFloat((cur+0.5).toFixed(2));
+    render();return;
+  }
+  if(a==='shop-qty-dec'){
+    const name=btn.dataset.item;
+    const cur=(S.shopQty[name]??parseFloat(btn.dataset.need))||1;
+    S.shopQty[name]=parseFloat(Math.max(0.5,cur-0.5).toFixed(2));
+    render();return;
+  }
+  if(a==='shop-check-all'){
+    const list=buildShopList();
+    const allChecked=list.every(i=>S.shopBought[i.name]);
+    const nb={};
+    list.forEach(i=>{
+      nb[i.name]=!allChecked;
+      if(!allChecked&&S.shopQty[i.name]==null)S.shopQty[i.name]=i.need;
+    });
+    S.shopBought=nb;
+    render();return;
+  }
+  if(a==='shop-done'){shopDone();return;}
   if(a==='meals-view'){setState({mealsView:btn.dataset.view});return;}
   if(a==='undo-meal'){
     const entry=S.cookLog.find(e=>e.id===btn.dataset.lid);
