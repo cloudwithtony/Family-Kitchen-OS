@@ -677,6 +677,18 @@ function syncAddItemFromDOM(){
   if(g("ai-price"))S.addItem.price=parseFloat(g("ai-price").value)||0;
   if(g("ai-low"))S.addItem.low=parseInt(g("ai-low").value)||0;
 }
+// ── pantry autocomplete history ──
+const PANTRY_HIST_KEY='fk-pantry-hist';
+function loadPantryHistory(){try{return JSON.parse(localStorage.getItem(PANTRY_HIST_KEY))||[];}catch(e){return[];}}
+function savePantryHistory(h){try{localStorage.setItem(PANTRY_HIST_KEY,JSON.stringify(h));}catch(e){}}
+function upsertPantryHistory(item){
+  const h=loadPantryHistory();
+  const idx=h.findIndex(x=>x.name.toLowerCase()===item.name.toLowerCase());
+  const entry={name:item.name,qty:item.qty,unit:item.unit,loc:item.loc,cat:item.cat,expDays:item.expDays,price:item.price,low:item.low};
+  if(idx>=0)h.splice(idx,1);
+  h.unshift(entry);
+  savePantryHistory(h.slice(0,100));
+}
 function syncAddMealFromDOM(){
   if(!S.addMeal)return;
   const g=id=>document.getElementById(id);
@@ -2606,13 +2618,15 @@ function addItemModal(){
   const f=S.addItem;
   const cats=["protein","dairy","produce","frozen","pantry","snack","other"];
   const locs=["fridge","freezer","pantry"];
+  const hist=loadPantryHistory();
   const inp="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;width:100%;outline:none";
   const lbl="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px;letter-spacing:.05em";
   return`<div data-action="close-add-item" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center">
     <div data-action="noop" style="background:#0F1520;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px 32px;border:1px solid var(--border);border-bottom:none;max-height:90vh;overflow-y:auto">
       <div style="font-size:18px;font-weight:800;color:#E8EEF8;margin-bottom:14px">➕ Add Pantry Item</div>
-      <div style="margin-bottom:10px"><div style="${lbl}">ITEM NAME *</div>
-        <input id="ai-name" type="text" placeholder="e.g. Chicken Breast" value="${esc(f.name)}" style="${inp}"></div>
+      <datalist id="ai-name-list">${hist.map(h=>`<option value="${esc(h.name)}">`).join('')}</datalist>
+      <div style="margin-bottom:10px"><div style="${lbl}">ITEM NAME *${hist.length>0?` <span style="font-weight:400;color:#3B82F6">— start typing to recall previous items</span>`:''}</div>
+        <input id="ai-name" list="ai-name-list" type="text" placeholder="e.g. Chicken Breast" value="${esc(f.name)}" style="${inp}" autocomplete="off"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div><div style="${lbl}">QTY</div><input id="ai-qty" type="number" min="0" step="0.5" value="${f.qty}" style="${inp}"></div>
         <div><div style="${lbl}">UNIT</div><input id="ai-unit" type="text" placeholder="lbs, count, bags…" value="${esc(f.unit)}" style="${inp}"></div>
@@ -2749,7 +2763,7 @@ function levelsTab(){
       </div>
     </div>
     <div class="scroll fade" style="padding:14px 18px">
-      <div style="font-size:11px;color:#7B8FAE;margin-bottom:16px;line-height:1.5">${isKid?`${esc(prof.name)}'s Body XP comes from Running Club, Spiritual XP from Meditation/Mantra sessions, and Dad can hand-award a small boost below.`:'Brain, Body, Wealth & Spiritual XP grows automatically from missions, workouts, meditation and finance you log — no manual entry. Go quiet too long on a track and it gradually fades.'}</div>
+      <div style="font-size:11px;color:#7B8FAE;margin-bottom:16px;line-height:1.5">${isKid?`${esc(prof.name)}'s XP builds from Strength workouts, BJJ class, Running Club (Body), Meditation/Mantra (Spiritual), and any manual boost Dad awards below.`:'Brain, Body, Wealth & Spiritual XP grows automatically from missions, workouts, meditation and finance you log — no manual entry. Go quiet too long on a track and it gradually fades.'}</div>
       ${LEVEL_TRACKS.map(t=>{
         const info=levelInfo(pid,t.id);
         return`<div style="margin-bottom:14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px">
@@ -3257,6 +3271,7 @@ function handleClick(e){
     }
     setState({items:updated,addItem:null});
     saveItems();
+    upsertPantryHistory({name:trimmedName,qty:parseFloat(f.qty)||0,unit:f.unit.trim()||"count",loc:f.loc,cat:f.cat,expDays:parseInt(f.expDays)||0,price:parseFloat(f.price)||0,low:parseInt(f.low)||0});
     showToast((existing?"✅ Updated ":"✅ ")+trimmedName+(existing?" in pantry!":" added to pantry!"));
     return;
   }
@@ -3335,10 +3350,20 @@ function attachInputEvents(){
       saveWeekPlan();
     });
   });
-  [["ai-name",v=>{if(S.addItem)S.addItem.name=v;}],
-   ["ai-unit",v=>{if(S.addItem)S.addItem.unit=v;}],
+  [["ai-unit",v=>{if(S.addItem)S.addItem.unit=v;}],
    ["am-name",v=>{if(S.addMeal)S.addMeal.name=v;}]
   ].forEach(([id,fn])=>{const el=document.getElementById(id);if(el)el.addEventListener("input",e=>fn(e.target.value));});
+  const aiName=document.getElementById("ai-name");
+  if(aiName)aiName.addEventListener("input",e=>{
+    if(!S.addItem)return;
+    const v=e.target.value;
+    S.addItem.name=v;
+    const match=loadPantryHistory().find(h=>h.name.toLowerCase()===v.toLowerCase());
+    if(match){
+      Object.assign(S.addItem,{qty:match.qty,unit:match.unit,loc:match.loc,cat:match.cat,expDays:match.expDays,price:match.price,low:match.low});
+      render();
+    }
+  });
 
   if(S.finView?.type==='add-goal'){
     const updateGoalPreview=()=>{
