@@ -75,6 +75,10 @@ const YOGA_POSES=[
   {name:'Pigeon Pose',icon:'🕊️',sec:45},
   {name:'Savasana',icon:'🧘',sec:60},
 ];
+const SPIRIT_STEPS=[
+  {name:'Meditation',icon:'🧘‍♂️',sec:300},
+  {name:'Mantra',icon:'🕊️',sec:180},
+];
 const STRENGTH_EXERCISES=[
   {id:'pushups',name:'Push-Ups',icon:'💪'},
   {id:'squats',name:'Squats',icon:'🦵'},
@@ -108,9 +112,15 @@ const RUN_TARGET_LAPS=9;
 // LEVELING SYSTEM DATA (Brain / Body / Wealth)
 // ══════════════════════════════════════════════════
 const LEVEL_TRACKS=[
-  {id:'brain', icon:'🧠',name:'Brain', color:'#7C3AED'},
-  {id:'body',  icon:'💪',name:'Body',  color:'#16A34A'},
-  {id:'wealth',icon:'💰',name:'Wealth',color:'#D97706'},
+  {id:'brain',    icon:'🧠',name:'Brain',    color:'#7C3AED'},
+  {id:'body',     icon:'💪',name:'Body',     color:'#16A34A'},
+  {id:'wealth',   icon:'💰',name:'Wealth',   color:'#D97706'},
+  {id:'spiritual',icon:'🕊️',name:'Spiritual',color:'#0EA5E9'},
+];
+const LEVEL_PROFILES=[
+  {id:'dad',  name:'Dad',  icon:'👨'},
+  {id:'noah', name:'Noah', icon:'🧒'},
+  {id:'zayden',name:'Zayden',icon:'🧒'},
 ];
 const MISSION_TRACKS={sec:['wealth'],wlth:['wealth'],biz:['wealth','brain'],car:['brain'],exp:['brain']};
 const EX_TRACKS={
@@ -279,9 +289,10 @@ let S={
   finTab:'dash',finView:null,finRefreshing:false,finLastRefresh:null,
   // fitness
   fTab:'yoga',
-  fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[],randomEx:null},
-  // leveling (Brain/Body/Wealth XP)
-  levels:null,
+  fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[],randomEx:null,
+    spIdx:0,spSecLeft:0,spRunning:false,spActive:false,spProfile:'dad'},
+  // leveling (Brain/Body/Wealth/Spiritual XP, per profile)
+  levels:null,lvProfile:'dad',
   // running club
   rcTab:'week',rcView:null,
   // kitchen
@@ -291,6 +302,7 @@ let S={
 };
 let toastTimer=null;
 let yogaInterval=null;
+let spiritInterval=null;
 
 function setState(u,skipRender=false){
   S=Object.assign({},S,u);
@@ -528,14 +540,30 @@ function last14(){
 }
 
 // ══════════════════════════════════════════════════
-// LEVELING SYSTEM HELPERS (Brain / Body / Wealth)
+// LEVELING SYSTEM HELPERS (Brain / Body / Wealth / Spiritual — per profile)
 // ══════════════════════════════════════════════════
-function defaultLevels(){return{brain:{xp:0,lastActive:null},body:{xp:0,lastActive:null},wealth:{xp:0,lastActive:null}};}
+function defaultProfileLevels(){
+  const d={};LEVEL_TRACKS.forEach(t=>{d[t.id]={xp:0,lastActive:null};});return d;
+}
+function defaultLevels(){
+  const d={};LEVEL_PROFILES.forEach(p=>{d[p.id]=defaultProfileLevels();});return d;
+}
+// Migrates the original single-profile {brain,body,wealth} shape (pre-multi-profile)
+// into the 'dad' profile so nobody's existing XP is lost when this shipped.
 function loadLevels(){
   const d=defaultLevels();
   try{
     const raw=JSON.parse(localStorage.getItem('fk-levels'));
-    if(raw)LEVEL_TRACKS.forEach(t=>{if(raw[t.id])d[t.id]=raw[t.id];});
+    if(raw){
+      const isLegacyFlat=raw.brain&&typeof raw.brain.xp==='number'&&!LEVEL_PROFILES.some(p=>raw[p.id]);
+      if(isLegacyFlat){
+        LEVEL_TRACKS.forEach(t=>{if(raw[t.id])d.dad[t.id]=raw[t.id];});
+      }else{
+        LEVEL_PROFILES.forEach(p=>{
+          if(raw[p.id])LEVEL_TRACKS.forEach(t=>{if(raw[p.id][t.id])d[p.id][t.id]=raw[p.id][t.id];});
+        });
+      }
+    }
   }catch{}
   return d;
 }
@@ -547,29 +575,29 @@ function xpForLevel(level){return level<=1?0:50*level*(level-1);}
 function levelForXp(xp){let l=1;while(xpForLevel(l+1)<=xp)l++;return l;}
 
 // Decay is a pure function of (stored xp, lastActive, now) — never mutates storage on render.
-function effectiveXp(track){
-  const t=S.levels[track];
+function effectiveXp(profile,track){
+  const t=S.levels[profile]?.[track];
   if(!t)return 0;
   if(!t.lastActive)return t.xp;
   const days=Math.floor((Date.now()-new Date(t.lastActive).getTime())/86400000);
   const decayDays=Math.max(0,days-DECAY_GRACE_DAYS);
   return Math.max(0,t.xp-decayDays*DECAY_PER_DAY);
 }
-function levelInfo(track){
-  const xp=Math.round(effectiveXp(track));
+function levelInfo(profile,track){
+  const xp=Math.round(effectiveXp(profile,track));
   const level=levelForXp(xp);
   const floor=xpForLevel(level);
   const next=xpForLevel(level+1);
   const pct=next>floor?Math.max(0,Math.min(1,(xp-floor)/(next-floor))):1;
   return{xp,level,floor,next,pct};
 }
-function gainXp(track,amount){
-  if(!amount||amount<=0||!S.levels||!S.levels[track])return;
-  S.levels[track].xp=Math.round(effectiveXp(track)+amount);
-  S.levels[track].lastActive=now();
+function gainXp(profile,track,amount){
+  if(!amount||amount<=0||!S.levels[profile]?.[track])return;
+  S.levels[profile][track].xp=Math.round(effectiveXp(profile,track)+amount);
+  S.levels[profile][track].lastActive=now();
   saveLevels();
 }
-function awardXp(tracks,amount){(tracks||[]).forEach(t=>gainXp(t,amount));}
+function awardXp(profile,tracks,amount){(tracks||[]).forEach(t=>gainXp(profile,t,amount));}
 
 function weekMissionDays(){
   const checks=loadChecks();let count=0;
@@ -687,13 +715,53 @@ function finishYogaSession(){
   const totalSec=YOGA_POSES.reduce((s,p)=>s+p.sec,0);
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'yoga',date:now(),poses:YOGA_POSES.length,sec:totalSec},...S.fit.fitLog];
   saveFit();
-  awardXp(['brain','body'],15);
+  awardXp('dad',['brain','body'],15);
   S.fit.yogaActive=false;S.fit.yogaRunning=false;S.fit.yogaIdx=0;S.fit.yogaSecLeft=0;
   showToast('🧘 Yoga flow complete — nice work!');
 }
 function stopYoga(){
   if(yogaInterval){clearInterval(yogaInterval);yogaInterval=null;}
   S.fit.yogaActive=false;S.fit.yogaRunning=false;S.fit.yogaIdx=0;S.fit.yogaSecLeft=0;
+  render();
+}
+
+// ── spiritual (meditation/mantra) ──
+function startSpirit(){
+  S.fit.spActive=true;S.fit.spIdx=0;S.fit.spSecLeft=SPIRIT_STEPS[0].sec;S.fit.spRunning=true;
+  render();
+  tickSpiritLoop();
+}
+function tickSpiritLoop(){
+  if(spiritInterval)clearInterval(spiritInterval);
+  spiritInterval=setInterval(()=>{
+    if(!S.fit.spRunning)return;
+    S.fit.spSecLeft--;
+    if(S.fit.spSecLeft<=0)advanceSpiritStep();
+    else render();
+  },1000);
+}
+function pauseSpirit(){S.fit.spRunning=false;render();}
+function resumeSpirit(){S.fit.spRunning=true;render();}
+function skipSpiritStep(){advanceSpiritStep();}
+function advanceSpiritStep(){
+  S.fit.spIdx++;
+  if(S.fit.spIdx>=SPIRIT_STEPS.length){finishSpiritSession();return;}
+  S.fit.spSecLeft=SPIRIT_STEPS[S.fit.spIdx].sec;
+  render();
+}
+function finishSpiritSession(){
+  if(spiritInterval){clearInterval(spiritInterval);spiritInterval=null;}
+  const totalSec=SPIRIT_STEPS.reduce((s,p)=>s+p.sec,0);
+  const profile=S.fit.spProfile||'dad';
+  S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'spiritual',date:now(),profile,steps:SPIRIT_STEPS.length,sec:totalSec},...S.fit.fitLog];
+  saveFit();
+  awardXp(profile,['spiritual'],20);
+  S.fit.spActive=false;S.fit.spRunning=false;S.fit.spIdx=0;S.fit.spSecLeft=0;
+  showToast('🕊️ Spiritual session complete — nice work!');
+}
+function stopSpirit(){
+  if(spiritInterval){clearInterval(spiritInterval);spiritInterval=null;}
+  S.fit.spActive=false;S.fit.spRunning=false;S.fit.spIdx=0;S.fit.spSecLeft=0;
   render();
 }
 
@@ -722,9 +790,9 @@ function finishStrengthWorkout(){
   const detail=STRENGTH_EXERCISES.map(ex=>({ex:ex.id,sets:S.fit.strength[ex.id].filter(st=>st.done).map(st=>st.reps)})).filter(d=>d.sets.length);
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'strength',date:now(),sets:totalSets,detail},...S.fit.fitLog];
   saveFit();
-  awardXp(['body'],totalSets*3);
+  awardXp('dad',['body'],totalSets*3);
   const brainSets=detail.filter(d=>(EX_TRACKS[d.ex]||[]).includes('brain')).reduce((s,d)=>s+d.sets.length,0);
-  if(brainSets>0)awardXp(['brain'],brainSets*3);
+  if(brainSets>0)awardXp('dad',['brain'],brainSets*3);
   S.fit.strength={};
   showToast('💪 Workout logged — '+totalSets+' sets');
 }
@@ -742,7 +810,7 @@ function runLog(){
   const durationMin=S.fit.runStart?Math.max(1,Math.round((Date.now()-new Date(S.fit.runStart).getTime())/60000)):null;
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'run',date:now(),laps:S.fit.runLaps,miles,durationMin},...S.fit.fitLog];
   saveFit();
-  awardXp(['body'],Math.max(5,Math.round(miles*10)));
+  awardXp('dad',['body'],Math.max(5,Math.round(miles*10)));
   S.fit.runLaps=0;S.fit.runStart=null;
   showToast('🏃 Run logged — '+miles+' mi');
 }
@@ -759,7 +827,7 @@ function logRandomExercise(){
   if(!ex)return;
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'random',date:now(),exId:ex.id,exName:ex.name,icon:ex.icon},...S.fit.fitLog];
   saveFit();
-  awardXp(EX_TRACKS[ex.id]||['body'],8);
+  awardXp('dad',EX_TRACKS[ex.id]||['body'],8);
   S.fit.randomEx=null;
   showToast(`${ex.icon} ${ex.name} logged!`);
 }
@@ -770,6 +838,7 @@ function rcSaveLog(){
   const v=S.rcView?.data;
   if(!v||!v.laps||v.laps<=0){showToast('Log at least one lap first');return;}
   const entry=rcLogRun({person:v.person,laps:v.laps,effort:v.effort,mileTimeStr:v.mileTimeStr});
+  if(LEVEL_PROFILES.some(p=>p.id===entry.person))awardXp(entry.person,['body'],Math.max(5,Math.round(entry.miles*10)));
   S.rcView=null;
   const total=parseFloat((entry.earned+entry.prBonus).toFixed(2));
   showToast(entry.prBonus>0?`🏅 New PR! +${fmt(total)} earned`:`🏃 Run logged — ${fmt(total)} earned`);
@@ -836,7 +905,7 @@ function homeTab(){
   const ac=alertCount();
   const now_=new Date();
 
-  const lvSummary=LEVEL_TRACKS.map(t=>`${t.icon} Lv${levelInfo(t.id).level}`).join('  ·  ');
+  const lvSummary=LEVEL_TRACKS.map(t=>`${t.icon} Lv${levelInfo('dad',t.id).level}`).join('  ·  ');
 
   const btns=[
     {icon:'☑️',label:'Five Missions',sub:sc===5?'All 5 locked in — nice!':sc+' of 5 done today',color:'#2563EB',tab:'missions'},
@@ -901,7 +970,7 @@ function missionsHeader(){
   const key=todayKey();
   const day=getDay(key);
   const sc=score(day);
-  const wl=levelInfo('wealth'),br=levelInfo('brain');
+  const wl=levelInfo('dad','wealth'),br=levelInfo('dad','brain');
   return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">☑️ Five Missions</div>
@@ -1747,7 +1816,7 @@ function financeModal(){
 // FITNESS TAB
 // ══════════════════════════════════════════════════
 function fitnessTab(){
-  const bo=levelInfo('body'),br=levelInfo('brain');
+  const bo=levelInfo('dad','body'),br=levelInfo('dad','brain');
   return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
       <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">🏃 Fitness</div>
       <button data-action="top-tab" data-tab="levels" style="display:flex;gap:12px;margin-top:8px;background:none;padding:0">
@@ -1761,13 +1830,14 @@ function fitnessTab(){
       ${S.fTab==='strength'?fitnessStrength():''}
       ${S.fTab==='run'?fitnessRun():''}
       ${S.fTab==='random'?fitnessRandom():''}
+      ${S.fTab==='spirit'?fitnessSpiritual():''}
       ${S.fTab==='club'?fitnessClub():''}
     </div>
   `;
 }
 
 function fitnessSubNav(){
-  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
+  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'},{id:'spirit',icon:'🕊️',label:'Spirit'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
   return`<div style="display:flex;gap:6px;padding:10px 16px 4px;flex-shrink:0">
     ${tabs.map(t=>`<button data-action="f-tab" data-ftab="${t.id}" style="flex:1;padding:9px 4px;background:${S.fTab===t.id?'#16A34A':'var(--card)'};color:${S.fTab===t.id?'#fff':'var(--t2)'};border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${S.fTab===t.id?'#16A34A':'var(--border)'}">${t.icon} ${t.label}</button>`).join('')}
   </div>`;
@@ -1814,6 +1884,58 @@ function fitnessYoga(){
     ${recent.map(l=>`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
       <span style="font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()}</span>
       <span style="font-size:12px;color:#EEF2FF;font-weight:700">${l.poses} poses · ${Math.round(l.sec/60)} min</span>
+    </div>`).join('')}`:''}
+  </div>`;
+}
+function fitnessSpiritual(){
+  const recent=S.fit.fitLog.filter(l=>l.type==='spiritual').slice(0,5);
+  const profile=S.fit.spProfile||'dad';
+  if(S.fit.spActive){
+    const step=SPIRIT_STEPS[S.fit.spIdx];
+    const pct=step.sec?Math.max(0,S.fit.spSecLeft/step.sec):0;
+    const ring=`conic-gradient(#0EA5E9 ${pct*360}deg, #1C2D45 0deg)`;
+    return`<div class="scroll fade" style="padding-top:14px;text-align:center">
+      <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:18px">STEP ${S.fit.spIdx+1} OF ${SPIRIT_STEPS.length} · ${esc(LEVEL_PROFILES.find(p=>p.id===profile)?.name||'Dad')}</div>
+      <div style="position:relative;width:180px;height:180px;margin:0 auto 18px">
+        <div style="width:180px;height:180px;border-radius:50%;background:${ring};display:flex;align-items:center;justify-content:center">
+          <div style="width:156px;height:156px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column">
+            <div style="font-size:40px;margin-bottom:6px">${step.icon}</div>
+            <div style="font-size:32px;font-weight:900;color:#EEF2FF;line-height:1">${S.fit.spSecLeft}s</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:18px;font-weight:800;color:#EEF2FF;margin-bottom:20px">${esc(step.name)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <button data-action="${S.fit.spRunning?'spirit-pause':'spirit-resume'}" style="padding:14px;background:var(--card2);color:var(--t1);border-radius:12px;font-size:14px;font-weight:700;border:1px solid var(--border)">${S.fit.spRunning?'⏸ Pause':'▶ Resume'}</button>
+        <button data-action="spirit-skip" style="padding:14px;background:#1C2D45;color:#EEF2FF;border-radius:12px;font-size:14px;font-weight:700">Skip ›</button>
+      </div>
+      <button data-action="spirit-stop" style="width:100%;padding:12px;background:transparent;color:#EF4444;border-radius:12px;font-size:13px;font-weight:700;border:1px solid #7F1D1D">End Session</button>
+    </div>`;
+  }
+  return`<div class="scroll fade" style="padding-top:14px">
+    <label style="font-size:11px;color:#4A5D7A;display:block;margin-bottom:8px">WHO'S PRACTICING?</label>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:16px">
+      ${LEVEL_PROFILES.map(pp=>`<button data-action="spirit-pick-profile" data-profile="${pp.id}" style="padding:10px 4px;background:${profile===pp.id?'#0EA5E9':'#111B2E'};border:1px solid ${profile===pp.id?'#0EA5E9':'#1E2D45'};border-radius:12px;text-align:center">
+        <div style="font-size:20px">${pp.icon}</div>
+        <div style="font-size:11px;font-weight:700;color:${profile===pp.id?'#fff':'#94A3B8'};margin-top:2px">${pp.name}</div>
+      </button>`).join('')}
+    </div>
+    <div style="text-align:center;padding:20px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border);margin-bottom:16px">
+      <div style="font-size:40px;margin-bottom:10px">🕊️</div>
+      <div style="font-size:16px;font-weight:800;color:#EEF2FF;margin-bottom:6px">Meditation & Mantra</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:16px;line-height:1.5">${SPIRIT_STEPS.length} steps · ~${Math.round(SPIRIT_STEPS.reduce((s,p)=>s+p.sec,0)/60)} min total</div>
+      <button data-action="spirit-start" style="width:100%;padding:14px;background:#0EA5E9;color:#fff;border-radius:14px;font-size:15px;font-weight:800;box-shadow:0 6px 20px #0EA5E955">▶ Start Session</button>
+    </div>
+    <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">THE SESSION</div>
+    ${SPIRIT_STEPS.map((p,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--card);border-radius:10px;margin-bottom:6px">
+      <span style="font-size:18px">${p.icon}</span>
+      <span style="flex:1;font-size:13px;color:#EEF2FF;font-weight:600">${esc(p.name)}</span>
+      <span style="font-size:11px;color:var(--t2)">${Math.round(p.sec/60)} min</span>
+    </div>`).join('')}
+    ${recent.length>0?`<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin:16px 0 10px">RECENT SESSIONS</div>
+    ${recent.map(l=>`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--card);border-radius:10px;margin-bottom:6px">
+      <span style="font-size:12px;color:var(--t2)">${new Date(l.date).toLocaleDateString()} · ${esc(LEVEL_PROFILES.find(p=>p.id===l.profile)?.name||'Dad')}</span>
+      <span style="font-size:12px;color:#EEF2FF;font-weight:700">${l.steps} steps · ${Math.round(l.sec/60)} min</span>
     </div>`).join('')}`:''}
   </div>`;
 }
@@ -2580,13 +2702,19 @@ function historyTab(){
 // LEVELS TAB
 // ══════════════════════════════════════════════════
 function levelsTab(){
+  const pid=S.lvProfile||'dad';
+  const prof=LEVEL_PROFILES.find(p=>p.id===pid)||LEVEL_PROFILES[0];
+  const isKid=pid!=='dad';
   return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
       <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">⭐ Levels</div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        ${LEVEL_PROFILES.map(p=>`<button data-action="lv-pick-profile" data-pid="${p.id}" style="flex:1;padding:8px 4px;background:${pid===p.id?'#7C3AED':'var(--card)'};color:${pid===p.id?'#fff':'var(--t2)'};border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${pid===p.id?'#7C3AED':'var(--border)'}">${p.icon} ${p.name}</button>`).join('')}
+      </div>
     </div>
     <div class="scroll fade" style="padding:14px 18px">
-      <div style="font-size:11px;color:#7B8FAE;margin-bottom:16px;line-height:1.5">Brain, Body & Wealth XP grows automatically from missions, workouts and finance you log — no manual entry. Go quiet too long on a track and it gradually fades.</div>
+      <div style="font-size:11px;color:#7B8FAE;margin-bottom:16px;line-height:1.5">${isKid?`${esc(prof.name)}'s Body XP comes from Running Club, Spiritual XP from Meditation/Mantra sessions, and Dad can hand-award a small boost below.`:'Brain, Body, Wealth & Spiritual XP grows automatically from missions, workouts, meditation and finance you log — no manual entry. Go quiet too long on a track and it gradually fades.'}</div>
       ${LEVEL_TRACKS.map(t=>{
-        const info=levelInfo(t.id);
+        const info=levelInfo(pid,t.id);
         return`<div style="margin-bottom:14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <div style="display:flex;align-items:center;gap:10px">
@@ -2605,12 +2733,20 @@ function levelsTab(){
         </div>`;
       }).join('')}
 
+      ${isKid?`<div style="margin-top:8px;margin-bottom:14px;padding:14px 16px;background:#0D1421;border-radius:14px;border:1px solid #1C2D45">
+        <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:10px">MANUAL XP BOOST — for chores, schoolwork, etc.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${LEVEL_TRACKS.map(t=>`<button data-action="lv-manual-boost" data-pid="${pid}" data-track="${t.id}" style="padding:10px 6px;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:12px;font-weight:700;color:${t.color}">${t.icon} +10 ${t.name}</button>`).join('')}
+        </div>
+      </div>`:''}
+
       <div style="margin-top:8px;padding:14px 16px;background:#0D1421;border-radius:14px;border:1px solid #1C2D45">
         <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:6px">HOW XP IS EARNED</div>
         <div style="font-size:11px;color:var(--t2);line-height:1.7">
           🛡️ Security & 🏗️ Wealth missions → Wealth · ⚡ Business → Wealth + Brain · 🎯 Career & 🌱 Family → Brain<br>
           🧘 Yoga → Brain + Body · 💪 Strength & 🎲 Dice → Body (+ Brain for Plank / Wall Sit / Side Plank) · 🏃 Run → Body<br>
-          📅 Logging a finance week scores your whole week (finance + missions + fitness) for bonus XP across all three.
+          🕊️ Meditation & Mantra → Spiritual (Dad, Noah or Zayden) · 🏃 Running Club → Body for whoever logged the run<br>
+          📅 Logging a finance week scores Dad's whole week (finance + missions + fitness) for bonus XP across Wealth/Brain/Body.
         </div>
       </div>
     </div>`;
@@ -2625,6 +2761,16 @@ function handleClick(e){
 
   // ── top nav ──
   if(a==='top-tab'){setState({topTab:btn.dataset.tab});return;}
+
+  // ── levels ──
+  if(a==='lv-pick-profile'){setState({lvProfile:btn.dataset.pid});return;}
+  if(a==='lv-manual-boost'){
+    gainXp(btn.dataset.pid,btn.dataset.track,10);
+    const t=LEVEL_TRACKS.find(t=>t.id===btn.dataset.track);
+    const p=LEVEL_PROFILES.find(p=>p.id===btn.dataset.pid);
+    showToast(`${t?.icon||''} +10 ${t?.name||''} XP for ${p?.name||''}`);
+    return;
+  }
 
   // ── missions ──
   if(a==='m-tab'){setState({mTab:btn.dataset.mtab,view:null});return;}
@@ -2659,7 +2805,7 @@ function handleClick(e){
     day.locked=true;
     saveDay(key,day);
     const sc=score(day);
-    if(!wasLocked)M.forEach(m=>{if(day[m.id])awardXp(MISSION_TRACKS[m.id],10);});
+    if(!wasLocked)M.forEach(m=>{if(day[m.id])awardXp('dad',MISSION_TRACKS[m.id],10);});
     const msg=sc===5?'🔥 Perfect day. All 5 missions.':sc>=4?`✓ Locked in — ${sc}/5. Strong day.`:`Locked in — ${sc}/5. Tomorrow.`;
     showToast(msg);
     return;
@@ -2745,9 +2891,9 @@ function handleClick(e){
     d.weeks.push({key,weekLabel:finWeekLabel(),anthon:d.anthon,lexi:d.lexi,total,bills,funds,net,date:new Date().toISOString()});
     saveVF(d);
     const lifeScore=weeklyLifeScore(net,total);
-    gainXp('wealth',Math.round(lifeScore*0.5));
-    gainXp('brain',Math.round(lifeScore*0.25));
-    gainXp('body',Math.round(lifeScore*0.25));
+    gainXp('dad','wealth',Math.round(lifeScore*0.5));
+    gainXp('dad','brain',Math.round(lifeScore*0.25));
+    gainXp('dad','body',Math.round(lifeScore*0.25));
     showToast(`Week logged ✓ — whole-life score ${lifeScore}/100`);
     return;
   }
@@ -2938,6 +3084,12 @@ function handleClick(e){
   if(a==='run-log'){runLog();render();return;}
   if(a==='roll-dice'){rollDice();return;}
   if(a==='random-done'){logRandomExercise();return;}
+  if(a==='spirit-pick-profile'){S.fit.spProfile=btn.dataset.profile;render();return;}
+  if(a==='spirit-start'){startSpirit();return;}
+  if(a==='spirit-pause'){pauseSpirit();return;}
+  if(a==='spirit-resume'){resumeSpirit();return;}
+  if(a==='spirit-skip'){skipSpiritStep();return;}
+  if(a==='spirit-stop'){stopSpirit();return;}
   // ── running club ──
   if(a==='rc-tab'){setState({rcTab:btn.dataset.rctab});return;}
   if(a==='rc-open-log'){rcOpenLogModal();return;}
