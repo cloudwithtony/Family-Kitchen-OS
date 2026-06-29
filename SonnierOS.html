@@ -105,6 +105,24 @@ const RUN_LAP_MILES=0.25;
 const RUN_TARGET_LAPS=9;
 
 // ══════════════════════════════════════════════════
+// LEVELING SYSTEM DATA (Brain / Body / Wealth)
+// ══════════════════════════════════════════════════
+const LEVEL_TRACKS=[
+  {id:'brain', icon:'🧠',name:'Brain', color:'#7C3AED'},
+  {id:'body',  icon:'💪',name:'Body',  color:'#16A34A'},
+  {id:'wealth',icon:'💰',name:'Wealth',color:'#D97706'},
+];
+const MISSION_TRACKS={sec:['wealth'],wlth:['wealth'],biz:['wealth','brain'],car:['brain'],exp:['brain']};
+const EX_TRACKS={
+  pushups:['body'],squats:['body'],lunges:['body'],pullups:['body'],situps:['body'],
+  burpees:['body'],mtnclimb:['body'],jjacks:['body'],gbridge:['body'],tdips:['body'],
+  hknees:['body'],superman:['body'],bcrunch:['body'],
+  plank:['body','brain'],wallsit:['body','brain'],splank:['body','brain'],
+};
+const DECAY_GRACE_DAYS=2;
+const DECAY_PER_DAY=8;
+
+// ══════════════════════════════════════════════════
 // RUNNING CLUB DATA
 // ══════════════════════════════════════════════════
 const RC_PEOPLE=[
@@ -262,6 +280,8 @@ let S={
   // fitness
   fTab:'yoga',
   fit:{yogaIdx:0,yogaSecLeft:0,yogaRunning:false,yogaActive:false,strength:{},runLaps:0,runStart:null,fitLog:[],randomEx:null},
+  // leveling (Brain/Body/Wealth XP)
+  levels:null,
   // running club
   rcTab:'week',rcView:null,
   // kitchen
@@ -508,6 +528,79 @@ function last14(){
 }
 
 // ══════════════════════════════════════════════════
+// LEVELING SYSTEM HELPERS (Brain / Body / Wealth)
+// ══════════════════════════════════════════════════
+function defaultLevels(){return{brain:{xp:0,lastActive:null},body:{xp:0,lastActive:null},wealth:{xp:0,lastActive:null}};}
+function loadLevels(){
+  const d=defaultLevels();
+  try{
+    const raw=JSON.parse(localStorage.getItem('fk-levels'));
+    if(raw)LEVEL_TRACKS.forEach(t=>{if(raw[t.id])d[t.id]=raw[t.id];});
+  }catch{}
+  return d;
+}
+function saveLevels(){try{localStorage.setItem('fk-levels',JSON.stringify(S.levels));}catch{}}
+
+// Level is a pure function of XP via an escalating threshold curve — no separate
+// "level drop" logic needed: as decayed XP falls, levelForXp naturally returns a lower level.
+function xpForLevel(level){return level<=1?0:50*level*(level-1);}
+function levelForXp(xp){let l=1;while(xpForLevel(l+1)<=xp)l++;return l;}
+
+// Decay is a pure function of (stored xp, lastActive, now) — never mutates storage on render.
+function effectiveXp(track){
+  const t=S.levels[track];
+  if(!t)return 0;
+  if(!t.lastActive)return t.xp;
+  const days=Math.floor((Date.now()-new Date(t.lastActive).getTime())/86400000);
+  const decayDays=Math.max(0,days-DECAY_GRACE_DAYS);
+  return Math.max(0,t.xp-decayDays*DECAY_PER_DAY);
+}
+function levelInfo(track){
+  const xp=Math.round(effectiveXp(track));
+  const level=levelForXp(xp);
+  const floor=xpForLevel(level);
+  const next=xpForLevel(level+1);
+  const pct=next>floor?Math.max(0,Math.min(1,(xp-floor)/(next-floor))):1;
+  return{xp,level,floor,next,pct};
+}
+function gainXp(track,amount){
+  if(!amount||amount<=0||!S.levels||!S.levels[track])return;
+  S.levels[track].xp=Math.round(effectiveXp(track)+amount);
+  S.levels[track].lastActive=now();
+  saveLevels();
+}
+function awardXp(tracks,amount){(tracks||[]).forEach(t=>gainXp(t,amount));}
+
+function weekMissionDays(){
+  const checks=loadChecks();let count=0;
+  for(let i=0;i<7;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const day=checks[k];
+    if(day&&day.locked&&score(day)>=4)count++;
+  }
+  return count;
+}
+function weekFitCount(){
+  const cutoff=Date.now()-7*86400000;
+  return S.fit.fitLog.filter(l=>new Date(l.date).getTime()>=cutoff).length;
+}
+function financeScoreComponent(net,income){
+  if(income<=0)return net>=0?20:0;
+  const p=net/income;
+  if(p>=.20)return 40;
+  if(p>=.08)return 25;
+  if(p>=0)return 10;
+  return 0;
+}
+function weeklyLifeScore(net,income){
+  const fin=financeScoreComponent(net,income);
+  const mis=Math.round((weekMissionDays()/7)*30);
+  const fit=Math.min(30,weekFitCount()*6);
+  return Math.min(100,fin+mis+fit);
+}
+
+// ══════════════════════════════════════════════════
 // KITCHEN HELPERS
 // ══════════════════════════════════════════════════
 function daysLeft(item){
@@ -594,6 +687,7 @@ function finishYogaSession(){
   const totalSec=YOGA_POSES.reduce((s,p)=>s+p.sec,0);
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'yoga',date:now(),poses:YOGA_POSES.length,sec:totalSec},...S.fit.fitLog];
   saveFit();
+  awardXp(['brain','body'],15);
   S.fit.yogaActive=false;S.fit.yogaRunning=false;S.fit.yogaIdx=0;S.fit.yogaSecLeft=0;
   showToast('🧘 Yoga flow complete — nice work!');
 }
@@ -628,6 +722,9 @@ function finishStrengthWorkout(){
   const detail=STRENGTH_EXERCISES.map(ex=>({ex:ex.id,sets:S.fit.strength[ex.id].filter(st=>st.done).map(st=>st.reps)})).filter(d=>d.sets.length);
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'strength',date:now(),sets:totalSets,detail},...S.fit.fitLog];
   saveFit();
+  awardXp(['body'],totalSets*3);
+  const brainSets=detail.filter(d=>(EX_TRACKS[d.ex]||[]).includes('brain')).reduce((s,d)=>s+d.sets.length,0);
+  if(brainSets>0)awardXp(['brain'],brainSets*3);
   S.fit.strength={};
   showToast('💪 Workout logged — '+totalSets+' sets');
 }
@@ -645,6 +742,7 @@ function runLog(){
   const durationMin=S.fit.runStart?Math.max(1,Math.round((Date.now()-new Date(S.fit.runStart).getTime())/60000)):null;
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'run',date:now(),laps:S.fit.runLaps,miles,durationMin},...S.fit.fitLog];
   saveFit();
+  awardXp(['body'],Math.max(5,Math.round(miles*10)));
   S.fit.runLaps=0;S.fit.runStart=null;
   showToast('🏃 Run logged — '+miles+' mi');
 }
@@ -661,6 +759,7 @@ function logRandomExercise(){
   if(!ex)return;
   S.fit.fitLog=[{id:'f'+Date.now().toString(36),type:'random',date:now(),exId:ex.id,exName:ex.name,icon:ex.icon},...S.fit.fitLog];
   saveFit();
+  awardXp(EX_TRACKS[ex.id]||['body'],8);
   S.fit.randomEx=null;
   showToast(`${ex.icon} ${ex.name} logged!`);
 }
@@ -707,6 +806,7 @@ function render(){
   else if(S.topTab==='fitness')content=fitnessTab();
   else if(S.topTab==='kitchen')content=kitchenTab();
   else if(S.topTab==='history')content=historyTab();
+  else if(S.topTab==='levels')content=levelsTab();
 
   document.getElementById('app').innerHTML=`
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden" class="fade">${content}</div>
@@ -736,9 +836,12 @@ function homeTab(){
   const ac=alertCount();
   const now_=new Date();
 
+  const lvSummary=LEVEL_TRACKS.map(t=>`${t.icon} Lv${levelInfo(t.id).level}`).join('  ·  ');
+
   const btns=[
     {icon:'☑️',label:'Five Missions',sub:sc===5?'All 5 locked in — nice!':sc+' of 5 done today',color:'#2563EB',tab:'missions'},
     {icon:'🏃',label:'Fitness',sub:'Yoga · Strength · Run · Club',color:'#16A34A',tab:'fitness'},
+    {icon:'⭐',label:'Levels',sub:lvSummary,color:'#7C3AED',tab:'levels'},
     {icon:'🍽️',label:'Kitchen',sub:ac>0?ac+' alert'+(ac!==1?'s':'')+' need attention':'Pantry, meals & shopping',color:ac>0?'#DC2626':'#0D9488',tab:'kitchen'},
     {icon:'📊',label:'History',sub:'Streaks, sessions & cook log',color:'#7C3AED',tab:'history'},
   ];
@@ -798,12 +901,17 @@ function missionsHeader(){
   const key=todayKey();
   const day=getDay(key);
   const sc=score(day);
+  const wl=levelInfo('wealth'),br=levelInfo('brain');
   return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">☑️ Five Missions</div>
       ${day.locked?`<div style="background:#14532D;padding:5px 11px;border-radius:8px;font-size:11px;font-weight:700;color:#4ADE80">Locked ✓</div>`:
         sc===5?`<button data-action="lock-day" style="background:#16A34A;color:#fff;padding:7px 13px;border-radius:9px;font-size:12px;font-weight:700;box-shadow:0 4px 12px #16A34A44">Lock In ✓</button>`:''}
     </div>
+    <button data-action="top-tab" data-tab="levels" style="display:flex;gap:12px;margin-top:8px;background:none;padding:0">
+      <span style="font-size:10px;color:#D97706;font-weight:700">💰 Wealth Lv${wl.level}</span>
+      <span style="font-size:10px;color:#7C3AED;font-weight:700">🧠 Brain Lv${br.level}</span>
+    </button>
   </div>`;
 }
 
@@ -1639,8 +1747,13 @@ function financeModal(){
 // FITNESS TAB
 // ══════════════════════════════════════════════════
 function fitnessTab(){
+  const bo=levelInfo('body'),br=levelInfo('brain');
   return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
       <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">🏃 Fitness</div>
+      <button data-action="top-tab" data-tab="levels" style="display:flex;gap:12px;margin-top:8px;background:none;padding:0">
+        <span style="font-size:10px;color:#16A34A;font-weight:700">💪 Body Lv${bo.level}</span>
+        <span style="font-size:10px;color:#7C3AED;font-weight:700">🧠 Brain Lv${br.level}</span>
+      </button>
     </div>
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
       ${fitnessSubNav()}
@@ -2464,6 +2577,45 @@ function historyTab(){
   `;
 }
 // ══════════════════════════════════════════════════
+// LEVELS TAB
+// ══════════════════════════════════════════════════
+function levelsTab(){
+  return`<div style="padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg)">
+      <div style="font-size:19px;font-weight:800;color:#E8EEF8;letter-spacing:-.02em">⭐ Levels</div>
+    </div>
+    <div class="scroll fade" style="padding:14px 18px">
+      <div style="font-size:11px;color:#7B8FAE;margin-bottom:16px;line-height:1.5">Brain, Body & Wealth XP grows automatically from missions, workouts and finance you log — no manual entry. Go quiet too long on a track and it gradually fades.</div>
+      ${LEVEL_TRACKS.map(t=>{
+        const info=levelInfo(t.id);
+        return`<div style="margin-bottom:14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:24px">${t.icon}</span>
+              <div>
+                <div style="font-size:15px;font-weight:800;color:#EEF2FF">${t.name}</div>
+                <div style="font-size:11px;color:#7B8FAE">Level ${info.level}</div>
+              </div>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:${t.color}">${info.xp} XP</div>
+          </div>
+          <div style="height:8px;background:#131E30;border-radius:6px;overflow:hidden">
+            <div style="height:100%;width:${Math.round(info.pct*100)}%;background:${t.color};border-radius:6px"></div>
+          </div>
+          <div style="font-size:10px;color:#3A4D66;margin-top:6px">${info.xp-info.floor} / ${info.next-info.floor} XP to Level ${info.level+1}</div>
+        </div>`;
+      }).join('')}
+
+      <div style="margin-top:8px;padding:14px 16px;background:#0D1421;border-radius:14px;border:1px solid #1C2D45">
+        <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:6px">HOW XP IS EARNED</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.7">
+          🛡️ Security & 🏗️ Wealth missions → Wealth · ⚡ Business → Wealth + Brain · 🎯 Career & 🌱 Family → Brain<br>
+          🧘 Yoga → Brain + Body · 💪 Strength & 🎲 Dice → Body (+ Brain for Plank / Wall Sit / Side Plank) · 🏃 Run → Body<br>
+          📅 Logging a finance week scores your whole week (finance + missions + fitness) for bonus XP across all three.
+        </div>
+      </div>
+    </div>`;
+}
+// ══════════════════════════════════════════════════
 // EVENTS
 // ══════════════════════════════════════════════════
 function handleClick(e){
@@ -2503,9 +2655,11 @@ function handleClick(e){
   if(a==='lock-day'){
     const key=todayKey();
     const day=getDay(key);
+    const wasLocked=day.locked;
     day.locked=true;
     saveDay(key,day);
     const sc=score(day);
+    if(!wasLocked)M.forEach(m=>{if(day[m.id])awardXp(MISSION_TRACKS[m.id],10);});
     const msg=sc===5?'🔥 Perfect day. All 5 missions.':sc>=4?`✓ Locked in — ${sc}/5. Strong day.`:`Locked in — ${sc}/5. Tomorrow.`;
     showToast(msg);
     return;
@@ -2587,8 +2741,15 @@ function handleClick(e){
     const total=d.anthon+d.lexi;
     const bills=d.bills.reduce((s,b)=>s+b.weekly,0);
     const funds=d.funds.reduce((s,f)=>s+f.weekly,0);
-    d.weeks.push({key,weekLabel:finWeekLabel(),anthon:d.anthon,lexi:d.lexi,total,bills,funds,net:total-bills-funds,date:new Date().toISOString()});
-    saveVF(d);showToast('Week logged ✓');return;
+    const net=total-bills-funds;
+    d.weeks.push({key,weekLabel:finWeekLabel(),anthon:d.anthon,lexi:d.lexi,total,bills,funds,net,date:new Date().toISOString()});
+    saveVF(d);
+    const lifeScore=weeklyLifeScore(net,total);
+    gainXp('wealth',Math.round(lifeScore*0.5));
+    gainXp('brain',Math.round(lifeScore*0.25));
+    gainXp('body',Math.round(lifeScore*0.25));
+    showToast(`Week logged ✓ — whole-life score ${lifeScore}/100`);
+    return;
   }
 
   if(a==='fin-save-goal'){
@@ -3067,6 +3228,7 @@ function init(){
   S.weekPlan=plan||emptyPlan();
   S.cookLog=log||[];
   S.fit.fitLog=fitLog||[];
+  S.levels=loadLevels();
   if(reseed){
     saveItems();saveRecipes();
     try{localStorage.setItem("fk-seed-v",String(KITCHEN_SEED_VERSION));}catch{}
