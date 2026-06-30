@@ -1511,32 +1511,45 @@ function financeAccounts(){
       <div style="font-size:11px;color:#4A5D7A;margin-top:6px">${d.accounts.length} account${d.accounts.length!==1?'s':''} tracked · updated ${finTimeAgo(S.finLastRefresh)}</div>
     </div>
 
-    <div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:10px">YOUR ACCOUNTS</div>
+    ${d.accounts.length===0?`<div style="font-size:10px;color:#3A4D66;font-weight:700;letter-spacing:.08em;margin-bottom:10px">YOUR ACCOUNTS</div><div class="fin-card" style="padding:32px;text-align:center;color:#3A4D66;font-size:13px">No accounts yet.<br>Add your first account below.</div>`:''}
 
-    ${d.accounts.length===0?`<div class="fin-card" style="padding:32px;text-align:center;color:#3A4D66;font-size:13px">No accounts yet.<br>Add your first account below.</div>`:''}
-
-    ${d.accounts.map((a,i)=>{
-      const tc=FIN_ACCT_COLORS[a.type]||'#94A3B8';
-      const linkedGoal=d.goals.find(g=>g.id===a.goalId);
-      return`<div class="fin-card" style="padding:16px;margin-bottom:10px;border-left:3px solid ${tc}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-              <span style="font-size:15px;font-weight:700;color:#F0F4FF">${esc(a.name)}</span>
-              <span style="font-size:9px;font-weight:700;color:${tc};background:${tc}22;padding:2px 7px;border-radius:4px">${FIN_ACCT_TYPES[a.type]||a.type}</span>
+    ${(()=>{
+      const ORDER=['checking','savings','hysa','invest','business','kid'];
+      const groups=ORDER.map(type=>({type,label:FIN_ACCT_TYPES[type],color:FIN_ACCT_COLORS[type]||'#94A3B8',items:d.accounts.map((a,i)=>({...a,_i:i})).filter(a=>a.type===type)})).filter(g=>g.items.length>0);
+      const ungrouped=d.accounts.map((a,i)=>({...a,_i:i})).filter(a=>!ORDER.includes(a.type));
+      if(ungrouped.length)groups.push({type:'other',label:'OTHER',color:'#94A3B8',items:ungrouped});
+      return groups.map(g=>{
+        const groupTotal=g.items.reduce((s,a)=>s+a.balance,0);
+        return`<div style="margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:10px;height:10px;border-radius:3px;background:${g.color}"></div>
+              <span style="font-size:10px;color:#4A5D7A;font-weight:700;letter-spacing:.08em">${g.label}</span>
             </div>
-            <div style="font-size:11px;color:#4A5D7A">${esc(a.institution||'')}${a.last4?' ···'+a.last4:''}${a.institution?' · ':''}Updated ${finTimeAgo(a.lastUpdated)}</div>
+            <span style="font-size:12px;font-weight:700;color:${groupTotal>=0?g.color:'#EF4444'}">${finFmt(groupTotal)}</span>
           </div>
-          <button data-action="fin-del-account" data-idx="${i}" style="color:#3A4D66;font-size:20px;background:none;padding:0 4px;line-height:1">×</button>
-        </div>
-        <div style="font-size:36px;font-weight:900;color:${a.balance>=0?tc:'#EF4444'};line-height:1;letter-spacing:-.02em;margin-bottom:12px">${finFmt(a.balance)}</div>
-        ${linkedGoal?`<div style="font-size:11px;color:#4A5D7A;background:#0D1628;border-radius:8px;padding:7px 10px;margin-bottom:10px">🎯 Saving for: <span style="color:#F0F4FF;font-weight:600">${esc(linkedGoal.name)}</span></div>`:''}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button data-action="fin-update-balance" data-idx="${i}" style="padding:10px;background:linear-gradient(135deg,#1A2840,#111B2E);border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:700;color:#3B82F6">Update Balance</button>
-          <button data-action="fin-open-transaction" data-idx="${i}" style="padding:10px;background:#111B2E;border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:600;color:#94A3B8">+ Transaction</button>
-        </div>
-      </div>`;
-    }).join('')}
+          ${g.items.map(a=>{
+            const tc=FIN_ACCT_COLORS[a.type]||'#94A3B8';
+            const linkedGoal=d.goals.find(gg=>gg.id===a.goalId);
+            return`<div class="fin-card" style="padding:16px;margin-bottom:8px;border-left:3px solid ${tc}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:#F0F4FF;margin-bottom:3px">${esc(a.name)}</div>
+                  <div style="font-size:11px;color:#4A5D7A">${esc(a.institution||'')}${a.last4?' ···'+a.last4:''}${a.institution?' · ':''}Updated ${finTimeAgo(a.lastUpdated)}</div>
+                </div>
+                <button data-action="fin-del-account" data-idx="${a._i}" style="color:#3A4D66;font-size:20px;background:none;padding:0 4px;line-height:1">×</button>
+              </div>
+              <div style="font-size:34px;font-weight:900;color:${a.balance>=0?tc:'#EF4444'};line-height:1;letter-spacing:-.02em;margin-bottom:10px">${finFmt(a.balance)}</div>
+              ${linkedGoal?`<div style="font-size:11px;color:#4A5D7A;background:#0D1628;border-radius:8px;padding:7px 10px;margin-bottom:10px">🎯 Saving for: <span style="color:#F0F4FF;font-weight:600">${esc(linkedGoal.name)}</span></div>`:''}
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button data-action="fin-update-balance" data-idx="${a._i}" style="padding:10px;background:linear-gradient(135deg,#1A2840,#111B2E);border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:700;color:#3B82F6">Update Balance</button>
+                <button data-action="fin-open-transaction" data-idx="${a._i}" style="padding:10px;background:#111B2E;border:1px solid #2A3D55;border-radius:10px;font-size:12px;font-weight:600;color:#94A3B8">+ Transaction</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('');
+    })()}
 
     <button data-action="fin-open-add-account" style="width:100%;padding:13px;background:#111B2E;border:1.5px dashed #2A3D55;border-radius:14px;font-size:13px;font-weight:700;color:#4A5D7A;margin-top:4px">
       + Add Account
@@ -1860,9 +1873,12 @@ function fitnessTab(){
 }
 
 function fitnessSubNav(){
-  const tabs=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'},{id:'spirit',icon:'🕊️',label:'Spirit'},{id:'bjj',icon:'🥋',label:'BJJ'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
-  return`<div style="display:flex;gap:6px;padding:10px 16px 4px;flex-shrink:0">
-    ${tabs.map(t=>`<button data-action="f-tab" data-ftab="${t.id}" style="flex:1;padding:9px 4px;background:${S.fTab===t.id?'#16A34A':'var(--card)'};color:${S.fTab===t.id?'#fff':'var(--t2)'};border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${S.fTab===t.id?'#16A34A':'var(--border)'}">${t.icon} ${t.label}</button>`).join('')}
+  const row1=[{id:'yoga',icon:'🧘',label:'Yoga'},{id:'strength',icon:'💪',label:'Strength'},{id:'run',icon:'🏃',label:'Run'},{id:'random',icon:'🎲',label:'Dice'}];
+  const row2=[{id:'spirit',icon:'🕊️',label:'Spirit'},{id:'bjj',icon:'🥋',label:'BJJ'},{id:'club',icon:'👨‍👩‍👧‍👦',label:'Club'}];
+  const btn=t=>`<button data-action="f-tab" data-ftab="${t.id}" style="flex:1;padding:8px 4px;background:${S.fTab===t.id?'#16A34A':'var(--card)'};color:${S.fTab===t.id?'#fff':'var(--t2)'};border-radius:10px;font-size:11px;font-weight:700;border:1px solid ${S.fTab===t.id?'#16A34A':'var(--border)'}">${t.icon} ${t.label}</button>`;
+  return`<div style="padding:8px 16px 4px;flex-shrink:0">
+    <div style="display:flex;gap:6px;margin-bottom:5px">${row1.map(btn).join('')}</div>
+    <div style="display:flex;gap:6px">${row2.map(btn).join('')}</div>
   </div>`;
 }
 
@@ -2443,10 +2459,29 @@ function kitchenMealsTab(){
   </div>`;
 }
 // ── KITCHEN PLAN ──
+function suggestWeekPlan(){
+  const mealTypes=['breakfast','lunch','dinner'];
+  const byType={};
+  mealTypes.forEach(mt=>{byType[mt]=S.recipes.filter(r=>r.cat===mt).map(r=>r.id);});
+  const plan={};
+  PLAN_DAYS.forEach(d=>{plan[d]={...S.weekPlan[d]};});
+  mealTypes.forEach(mt=>{
+    const pool=byType[mt];
+    if(!pool.length)return;
+    let idx=0;
+    PLAN_DAYS.forEach(d=>{
+      if(!plan[d][mt]){plan[d][mt]=pool[idx%pool.length];idx++;}
+    });
+  });
+  S.weekPlan=plan;
+  saveWeekPlan();
+  render();
+}
 function kitchenPlanTab(){
   const mealIcon={breakfast:"🌅",lunch:"☀️",dinner:"🌙"};
   const mealLabel={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner"};
   const planCount=PLAN_DAYS.reduce((n,d)=>n+["breakfast","lunch","dinner"].filter(m=>S.weekPlan[d][m]).length,0);
+  const allFilled=planCount===21;
   const sel="font-family:inherit;color:var(--t1);background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 8px;font-size:12px;width:100%;outline:none;appearance:none;-webkit-appearance:none";
   function recipeOpts(selId){
     const groups=["breakfast","lunch","dinner"];
@@ -2463,7 +2498,10 @@ function kitchenPlanTab(){
         <div style="font-size:13px;font-weight:700;color:#E8EEF8">${planCount} of 21 meals planned</div>
         <div style="font-size:10px;color:var(--t2);margin-top:2px">👨‍👩‍👧‍👦 Feeding ${FAMILY_SIZE} people</div>
       </div>
-      <button data-action="clear-plan" style="padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:11px;font-weight:600">Clear All</button>
+      <div style="display:flex;gap:6px">
+        ${!allFilled?`<button data-action="suggest-plan" style="padding:6px 12px;background:#1D3A5F;border:1px solid #2563EB;border-radius:8px;color:#60A5FA;font-size:11px;font-weight:700">✨ Suggest</button>`:''}
+        <button data-action="clear-plan" style="padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:11px;font-weight:600">Clear All</button>
+      </div>
     </div>
     ${PLAN_DAYS.map(d=>`<div style="background:var(--card);border-radius:14px;margin-bottom:8px;overflow:hidden;border:1px solid var(--border)">
       <div style="background:var(--card2);padding:9px 14px;font-size:12px;font-weight:800;color:#E8EEF8;border-bottom:1px solid var(--border)">${DAY_LABELS[d]}</div>
@@ -3305,6 +3343,7 @@ function handleClick(e){
     showToast("↩ "+e.recipeName+" undone — pantry restored!");
     return;
   }
+  if(a==='suggest-plan'){suggestWeekPlan();return;}
   if(a==='clear-plan'){S.weekPlan=emptyPlan();saveWeekPlan();render();return;}
   if(a==='goto-shop'){setState({kTab:"shop"});return;}
   if(a==='open-add-item'){
