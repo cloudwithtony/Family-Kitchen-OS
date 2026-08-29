@@ -1,0 +1,22 @@
+name = "sonnier-os-push"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# Reminder times, in UTC (24h "min hour day month weekday").
+# Defaults below are 9am / 1pm / 5pm / 9pm US Central (adjust for your timezone
+# and for daylight saving — cron here is always UTC, it does not shift with DST).
+[triggers]
+crons = ["0 15 * * *", "0 19 * * *", "0 23 * * *", "0 3 * * *"]
+
+[[kv_namespaces]]
+binding = "PUSH_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+VAPID_SUBJECT = "mailto:you@example.com"
+APP_URL = "https://cloudwithtony.github.io/Family-Kitchen-OS/"
+
+# Secrets (set with `wrangler secret put NAME`, do not put them here):
+#   VAPID_PUBLIC_KEY
+#   VAPID_PRIVATE_KEY
+#   APP_SECRET

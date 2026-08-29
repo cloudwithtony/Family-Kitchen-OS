@@ -1,0 +1,9 @@
+{
+  "name": "Sonnier OS",
+  "short_name": "Sonnier OS",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#060A12",
+  "theme_color": "#060A12"
+}

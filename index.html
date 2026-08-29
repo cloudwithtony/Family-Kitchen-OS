@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Sonnier OS">
 <meta name="theme-color" content="#060A12">
 <meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
 <title>Sonnier OS</title>
 <style>
 :root{
@@ -40,6 +41,13 @@ button:active{opacity:.8;transform:scale(.98)}
 <div id="app"></div>
 <script>
 'use strict';
+// ══════════════════════════════════════════════════
+// PUSH NOTIFICATIONS CONFIG
+// Fill these in after deploying worker/ with `wrangler deploy` — see worker/README.md
+// ══════════════════════════════════════════════════
+const PUSH_WORKER_URL='https://sonnier-os-push.YOUR-SUBDOMAIN.workers.dev';
+const VAPID_PUBLIC_KEY='REPLACE_WITH_VAPID_PUBLIC_KEY';
+const PUSH_APP_SECRET='REPLACE_WITH_APP_SECRET';
 // ══════════════════════════════════════════════════
 // MISSIONS DATA
 // ══════════════════════════════════════════════════
@@ -540,6 +548,79 @@ function last14(){
 }
 
 // ══════════════════════════════════════════════════
+// PUSH NOTIFICATIONS
+// ══════════════════════════════════════════════════
+function pushEnabled(){try{return localStorage.getItem('fk-push-enabled')==='1';}catch{return false;}}
+function setPushEnabled(v){try{localStorage.setItem('fk-push-enabled',v?'1':'0');}catch{}}
+function pushSupported(){return 'serviceWorker' in navigator && 'PushManager' in window;}
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+
+function registerServiceWorker(){
+  if(!pushSupported())return Promise.resolve(null);
+  return navigator.serviceWorker.register('sw.js').catch(()=>null);
+}
+
+async function pushFetch(path,body){
+  return fetch(`${PUSH_WORKER_URL}${path}`,{
+    method:'POST',
+    headers:{'content-type':'application/json','x-app-secret':PUSH_APP_SECRET},
+    body:JSON.stringify(body),
+  });
+}
+
+async function syncHabitStateToServer(){
+  if(!pushEnabled()||!pushSupported())return;
+  const key=todayKey();
+  const day=getDay(key);
+  try{
+    await pushFetch('/sync',{date:key,missions:{sec:!!day.sec,wlth:!!day.wlth,biz:!!day.biz,car:!!day.car,exp:!!day.exp},locked:!!day.locked,score:score(day)});
+  }catch{}
+}
+
+async function enablePushNotifications(){
+  if(!pushSupported()){showToast('Add this app to your Home Screen first, then enable notifications');return;}
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted'){showToast('Notifications permission denied');return;}
+  const reg=await registerServiceWorker();
+  if(!reg){showToast('Could not register for notifications');return;}
+  try{
+    const sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    await pushFetch('/subscribe',sub.toJSON());
+    setPushEnabled(true);
+    await syncHabitStateToServer();
+    showToast('🔔 Reminders enabled');
+  }catch(err){
+    showToast('Could not enable notifications');
+  }
+  render();
+}
+
+async function disablePushNotifications(){
+  setPushEnabled(false);
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    const sub=await reg?.pushManager.getSubscription();
+    if(sub){
+      await pushFetch('/unsubscribe',{endpoint:sub.endpoint});
+      await sub.unsubscribe();
+    }
+  }catch{}
+  showToast('Reminders turned off');
+  render();
+}
+
+// ══════════════════════════════════════════════════
 // LEVELING SYSTEM HELPERS (Brain / Body / Wealth / Spiritual — per profile)
 // ══════════════════════════════════════════════════
 function defaultProfileLevels(){
@@ -975,6 +1056,15 @@ function homeTab(){
       </div>
       <span style="color:rgba(255,255,255,.4);font-size:20px">↗</span>
     </a>
+
+    <button data-action="toggle-push" style="width:100%;margin-top:8px;padding:14px 16px;background:var(--card);border-radius:14px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;text-align:left">
+      <span style="font-size:22px">${pushEnabled()?'🔔':'🔕'}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:var(--t1)">Daily reminders</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:1px">${pushEnabled()?'On — nudges you about missions left today':'Off — tap to get notified about missions left today'}</div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:${pushEnabled()?'#16A34A':'var(--t3)'}">${pushEnabled()?'ON':'OFF'}</span>
+    </button>
 
     <div style="margin-top:8px;padding:14px 16px;background:var(--card);border-radius:14px;border:1px solid var(--border)">
       <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.08em;margin-bottom:8px">THE QUESTION THAT MATTERS</div>
@@ -2933,6 +3023,7 @@ function handleClick(e){
     day[mid]=!day[mid];
     saveDay(key,day);
     render();
+    syncHabitStateToServer();
     if(day[mid])showToast(`${M.find(m=>m.id===mid)?.icon} ${M.find(m=>m.id===mid)?.name} ✓`);
     return;
   }
@@ -2942,10 +3033,15 @@ function handleClick(e){
     const wasLocked=day.locked;
     day.locked=true;
     saveDay(key,day);
+    syncHabitStateToServer();
     const sc=score(day);
     if(!wasLocked)M.forEach(m=>{if(day[m.id])awardXp('dad',MISSION_TRACKS[m.id],10);});
     const msg=sc===5?'🔥 Perfect day. All 5 missions.':sc>=4?`✓ Locked in — ${sc}/5. Strong day.`:`Locked in — ${sc}/5. Tomorrow.`;
     showToast(msg);
+    return;
+  }
+  if(a==='toggle-push'){
+    if(pushEnabled())disablePushNotifications();else enablePushNotifications();
     return;
   }
   if(a==='save-income'){
@@ -3572,6 +3668,8 @@ function init(){
   if(!plan)saveWeekPlan();
   render();
   document.getElementById("app").addEventListener("click",handleClick);
+  registerServiceWorker();
+  if(pushEnabled())syncHabitStateToServer();
 }
 
 if(document.readyState==='loading'){
